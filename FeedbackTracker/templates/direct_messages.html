@@ -1,0 +1,296 @@
+{% extends 'layout.html' %}
+
+{% block title %}Messages - Feedback System{% endblock %}
+
+{% block content %}
+<div class="container-fluid h-100">
+    <div class="row h-100">
+        <!-- Left sidebar with contacts -->
+        <div class="col-md-4 col-lg-3 border-end p-0 bg-light">
+            <div class="p-3 bg-dark text-white border-bottom">
+                <h5 class="mb-0">Contacts</h5>
+            </div>
+            <div class="contacts-list overflow-auto">
+                {% for recipient in recipients %}
+                <div class="contact-item p-3 border-bottom hover-bg-light {% if selected_user_id == recipient.id %}active{% endif %}" 
+                     onclick="loadConversation('{{ recipient.id }}', '{{ recipient.username }}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0 text-dark">{{ recipient.username }}</h6>
+                            <small class="text-muted">
+                                {% if recipient.is_student() %}
+                                    <span class="badge bg-primary">Student</span>
+                                {% elif recipient.is_cc() %}
+                                    <span class="badge bg-info">CC</span>
+                                {% elif recipient.is_hod() %}
+                                    <span class="badge bg-warning">HOD</span>
+                                {% elif recipient.is_principal() %}
+                                    <span class="badge bg-danger">Principal</span>
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div id="unread-badge-{{ recipient.id }}" class="badge bg-primary d-none">0</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Right side chat area -->
+        <div class="col-md-8 col-lg-9 p-0 d-flex flex-column bg-white">
+            <div id="chatArea" class="flex-grow-1">
+                <div class="p-3 bg-dark text-white border-bottom" id="chatHeader">
+                    <h5 class="mb-0">Select a contact to start messaging</h5>
+                </div>
+                <div class="chat-messages p-3" id="messageContainer">
+                    <!-- Messages will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Message input area -->
+            <div class="message-input border-top p-3 bg-light">
+                <form id="messageForm" method="POST" action="{{ url_for('direct_message') }}" class="d-flex">
+                    <input type="hidden" name="recipient_id" id="recipient_id">
+                    <textarea class="form-control me-2" name="message" id="messageInput" rows="1" placeholder="Type a message..." required></textarea>
+                    <button type="submit" class="btn btn-primary px-4">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Forward Message Modal -->
+<div class="modal fade" id="forwardMessageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-share me-2"></i>Forward Message</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('direct_message') }}" method="POST" id="forwardMessageForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Original Message</label>
+                        <div class="alert alert-light border">
+                            <div class="d-flex justify-content-between">
+                                <p class="mb-1"><strong>From: <span id="originalSender"></span></strong></p>
+                                <small class="text-muted" id="originalTimestamp"></small>
+                            </div>
+                            <hr class="my-2">
+                            <div id="originalMessageText"></div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="forward_recipient_id" class="form-label">Forward To</label>
+                        <select class="form-select" id="forward_recipient_id" name="recipient_id" required>
+                            <option value="" selected disabled>Select Recipient</option>
+                            {% for recipient in recipients %}
+                                <option value="{{ recipient.id }}">
+                                    {{ recipient.username }}
+                                    {% if recipient.is_student() %}
+                                        (Student)
+                                    {% elif recipient.is_cc() %}
+                                        (Class Coordinator)
+                                    {% elif recipient.is_hod() %}
+                                        (HOD)
+                                    {% elif recipient.is_principal() %}
+                                        (Principal)
+                                    {% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="forward_message" class="form-label">Your Comments</label>
+                        <textarea class="form-control" id="forward_message" name="message" rows="3" required
+                                  placeholder="Add your comments before forwarding..."></textarea>
+                        <input type="hidden" id="original_message_id" name="original_message_id">
+                        <small class="form-text text-muted">
+                            The original message will be included automatically when forwarded.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-share me-1"></i> Forward Message
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.chat-messages {
+    height: calc(100vh - 240px);
+    overflow-y: auto;
+    background-color: #E5DDD5;
+}
+
+.message-bubble {
+    padding: 10px 15px;
+    border-radius: 15px;
+    margin: 5px 0;
+    max-width: 70%;
+    word-wrap: break-word;
+}
+
+.sent {
+    margin-left: auto;
+    background-color: #DCF8C6;
+}
+
+.received {
+    margin-right: auto;
+    background-color: #FFFFFF;
+}
+
+.contact-item {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.contact-item:hover, .contact-item.active {
+    background-color: #E8E8E8;
+}
+
+.message-info {
+    font-size: 0.8em;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+.message-time {
+    font-size: 0.7em;
+    color: #999;
+}
+</style>
+
+<script>
+let selectedRecipientId = null;
+let lastMessageTimestamp = null;
+const currentUserId = {{ current_user.id|tojson|safe }};
+
+// Load conversation with a recipient
+function loadConversation(recipientId, recipientName) {
+    selectedRecipientId = recipientId;
+    document.getElementById('recipient_id').value = recipientId;
+    document.getElementById('chatHeader').innerHTML = `<h5 class="mb-0">${recipientName}</h5>`;
+
+    // Mark selected contact as active
+    document.querySelectorAll('.contact-item').forEach(item => item.classList.remove('active'));
+    document.querySelector(`.contact-item[onclick*="${recipientId}"]`).classList.add('active');
+
+    // Load message history
+    fetch(`/api/messages/${recipientId}`)
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('messageContainer');
+            container.innerHTML = '';
+
+            data.messages.forEach(message => {
+                const messageHtml = createMessageElement(message);
+                container.innerHTML += messageHtml;
+            });
+
+            container.scrollTop = container.scrollHeight;
+            lastMessageTimestamp = data.messages.length > 0 ? 
+                new Date(data.messages[data.messages.length - 1].sent_date).getTime() : null;
+        });
+}
+
+// Render each message bubble
+function createMessageElement(message) {
+    const isSent = message.sender_id === currentUserId;
+    const messageClass = isSent ? 'sent' : 'received';
+    const time = new Date(message.sent_date).toLocaleTimeString();
+
+    return `
+        <div class="message-bubble ${messageClass}">
+            <div class="message-info">
+                <span class="sender">${message.sender_name}</span>
+                <span class="message-time">${time}</span>
+            </div>
+            <div class="message-content">${message.message}</div>
+        </div>
+    `;
+}
+
+// Submit a new message
+function sendMessage(event) {
+    event.preventDefault();
+
+    if (!selectedRecipientId) {
+        alert('Please select a recipient first');
+        return false;
+    }
+
+    const form = event.target;
+    const formData = new FormData(form);
+
+    fetch('/direct_message', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'  // Ensures Flask responds with JSON
+        },
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error("Message failed to send");
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            document.getElementById('messageInput').value = '';
+            loadConversation(selectedRecipientId, document.querySelector('#chatHeader h5').textContent);
+        } else {
+            alert('Message failed to send');
+        }
+    })
+    .catch(error => {
+        console.error('Send error:', error);
+        alert('An error occurred while sending the message.');
+    });
+
+    return false;
+}
+
+// Poll for new messages every 5 seconds
+setInterval(() => {
+    if (selectedRecipientId && lastMessageTimestamp) {
+        fetch(`/api/messages/${selectedRecipientId}/new?since=${lastMessageTimestamp}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.messages.length > 0) {
+                    const container = document.getElementById('messageContainer');
+                    data.messages.forEach(message => {
+                        const messageHtml = createMessageElement(message);
+                        container.innerHTML += messageHtml;
+                    });
+                    container.scrollTop = container.scrollHeight;
+                    lastMessageTimestamp = new Date(data.messages[data.messages.length - 1].sent_date).getTime();
+                }
+            });
+    }
+}, 5000);
+
+// Auto-resize the message textarea
+document.querySelector('textarea').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
+
+// Show the forward message modal (if applicable)
+function showForwardModal(messageId) {
+    document.getElementById('forwardMessageId').value = messageId;
+    new bootstrap.Modal(document.getElementById('forwardMessageModal')).show();
+}
+
+// Bind form submit handler
+document.getElementById('messageForm').addEventListener('submit', sendMessage);
+</script>
+
+{% endblock %}

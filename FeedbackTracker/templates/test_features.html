@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Demo - Feedback System</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        .chart-container {
+            height: 300px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .card {
+            margin-bottom: 20px;
+        }
+        .feature-header {
+            border-left: 4px solid #0d6efd;
+            padding-left: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <header class="mb-4">
+            <h1 class="text-center mb-3">Advanced Analytics Features Demo</h1>
+            <p class="text-center lead">Showcase of new features for the Feedback Management System</p>
+        </header>
+
+        <section class="mb-5">
+            <div class="feature-header">
+                <h2>1. Sentiment Trends Over Time</h2>
+                <p>Track how sentiment evolves over different time periods to identify patterns and improvements.</p>
+            </div>
+
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i> Sentiment Distribution</h5>
+                            <button class="btn btn-sm btn-outline-secondary refresh-btn" data-target="sentiment-trend">
+                                <i class="fas fa-sync-alt me-1"></i> Refresh Data
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="sentimentTrendChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="fas fa-percentage me-2"></i> Sentiment Ratio Trends</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="sentimentRatioChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-5">
+            <div class="feature-header">
+                <h2>2. AI-Powered Improvement Suggestions</h2>
+                <p>Intelligent recommendations based on feedback analysis to help identify areas for improvement.</p>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i> Smart Recommendations</h5>
+                    <button class="btn btn-sm btn-outline-secondary refresh-btn" data-target="ai-suggestions">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh Suggestions
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="aiSuggestionsContent" class="p-3">
+                        <div class="d-flex justify-content-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-5">
+            <div class="feature-header">
+                <h2>3. Comprehensive PDF Reports</h2>
+                <p>Generate detailed reports with visualizations and analysis for better decision-making.</p>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-file-pdf me-2"></i> Report Generation</h5>
+                </div>
+                <div class="card-body">
+                    <p>Comprehensive PDF reports include:</p>
+                    <ul>
+                        <li>Executive summary with key metrics</li>
+                        <li>Sentiment trend analysis over selected time periods</li>
+                        <li>Category performance comparisons</li>
+                        <li>AI-generated improvement suggestions</li>
+                        <li>Detailed category breakdowns</li>
+                    </ul>
+                    <div class="text-center mt-4">
+                        <a href="#" class="btn btn-primary me-2">
+                            <i class="fas fa-download me-1"></i> Full Report
+                        </a>
+                        <a href="#" class="btn btn-outline-primary me-2">
+                            <i class="fas fa-chart-pie me-1"></i> Sentiment Report
+                        </a>
+                        <a href="#" class="btn btn-outline-primary">
+                            <i class="fas fa-list-ul me-1"></i> Categories Report
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // Chart instances
+        let sentimentTrendChart = null;
+        let sentimentRatioChart = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize charts
+            initializeSentimentTrendChart();
+            initializeSentimentRatioChart();
+            
+            // Load initial data
+            loadSentimentTrends();
+            loadAiSuggestions();
+            
+            // Add event listeners for refresh buttons
+            document.querySelectorAll('.refresh-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const target = this.getAttribute('data-target');
+                    if (target === 'sentiment-trend') {
+                        loadSentimentTrends();
+                    } else if (target === 'ai-suggestions') {
+                        loadAiSuggestions();
+                    }
+                });
+            });
+        });
+
+        /**
+         * Initialize sentiment trend chart
+         */
+        function initializeSentimentTrendChart() {
+            const ctx = document.getElementById('sentimentTrendChart').getContext('2d');
+            
+            sentimentTrendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [], // Will be populated with time periods
+                    datasets: [
+                        {
+                            label: 'Positive',
+                            data: [], // Will be populated with positive sentiment counts
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)', // Green
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Neutral',
+                            data: [], // Will be populated with neutral sentiment counts
+                            backgroundColor: 'rgba(255, 205, 86, 0.6)', // Yellow
+                            borderColor: 'rgba(255, 205, 86, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Negative',
+                            data: [], // Will be populated with negative sentiment counts
+                            backgroundColor: 'rgba(255, 99, 132, 0.6)', // Red
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Time Period'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Feedback Count'
+                            },
+                            ticks: {
+                                stepSize: 10
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Sentiment Distribution Over Time',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+
+        /**
+         * Initialize sentiment ratio chart
+         */
+        function initializeSentimentRatioChart() {
+            const ctx = document.getElementById('sentimentRatioChart').getContext('2d');
+            
+            sentimentRatioChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [], // Will be populated with time periods
+                    datasets: [
+                        {
+                            label: 'Positive %',
+                            data: [], // Will be populated with positive sentiment percentages
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Neutral %',
+                            data: [], // Will be populated with neutral sentiment percentages
+                            backgroundColor: 'rgba(255, 205, 86, 0.1)',
+                            borderColor: 'rgba(255, 205, 86, 1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Negative %',
+                            data: [], // Will be populated with negative sentiment percentages
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Percentage (%)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time Period'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Sentiment Ratio Trends',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.raw.toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        /**
+         * Load sentiment trends data via AJAX
+         */
+        function loadSentimentTrends() {
+            fetch('/sentiment_trends_test')
+                .then(response => response.json())
+                .then(data => {
+                    updateSentimentTrendCharts(data);
+                })
+                .catch(error => {
+                    console.error('Error loading sentiment trends data:', error);
+                });
+        }
+
+        /**
+         * Load AI-generated improvement suggestions
+         */
+        function loadAiSuggestions() {
+            const suggestionsContainer = document.getElementById('aiSuggestionsContent');
+            
+            fetch('/ai_suggestions_test')
+                .then(response => response.json())
+                .then(data => {
+                    let html = '';
+                    
+                    if (data.suggestions && data.suggestions.length > 0) {
+                        html = '<ul class="list-group list-group-flush">';
+                        
+                        data.suggestions.forEach((suggestion, index) => {
+                            // Add different background colors based on relevance
+                            let bgClass = '';
+                            if (index === 0) bgClass = 'list-group-item-warning';
+                            else if (index === 1) bgClass = 'list-group-item-light';
+                            
+                            html += `<li class="list-group-item ${bgClass}">
+                                <h6 class="mb-1"><i class="fas fa-lightbulb text-warning me-2"></i> ${suggestion.theme}</h6>
+                                <p class="mb-0">${suggestion.suggestion}</p>
+                            </li>`;
+                        });
+                        
+                        html += '</ul>';
+                    } else {
+                        html = `<div class="text-center py-4">
+                            <i class="fas fa-smile fa-3x mb-3 text-success"></i>
+                            <p class="text-muted">No specific improvement suggestions at this time.</p>
+                        </div>`;
+                    }
+                    
+                    suggestionsContainer.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error loading AI suggestions:', error);
+                    suggestionsContainer.innerHTML = `<div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Error loading AI suggestions.
+                    </div>`;
+                });
+        }
+
+        /**
+         * Update sentiment trend charts with new data
+         */
+        function updateSentimentTrendCharts(data) {
+            const trendData = data.trend_data || [];
+            const ratioData = data.sentiment_ratio || [];
+            
+            // Update sentiment trend chart
+            if (sentimentTrendChart) {
+                const labels = trendData.map(item => item[0]); // Period labels
+                const positiveData = trendData.map(item => item[1].positive || 0);
+                const neutralData = trendData.map(item => item[1].neutral || 0);
+                const negativeData = trendData.map(item => item[1].negative || 0);
+                
+                sentimentTrendChart.data.labels = labels;
+                sentimentTrendChart.data.datasets[0].data = positiveData;
+                sentimentTrendChart.data.datasets[1].data = neutralData;
+                sentimentTrendChart.data.datasets[2].data = negativeData;
+                sentimentTrendChart.update();
+            }
+            
+            // Update sentiment ratio chart
+            if (sentimentRatioChart) {
+                const labels = ratioData.map(item => item[0]); // Period labels
+                const positiveRatios = ratioData.map(item => item[1].positive_ratio || 0);
+                const neutralRatios = ratioData.map(item => item[1].neutral_ratio || 0);
+                const negativeRatios = ratioData.map(item => item[1].negative_ratio || 0);
+                
+                sentimentRatioChart.data.labels = labels;
+                sentimentRatioChart.data.datasets[0].data = positiveRatios;
+                sentimentRatioChart.data.datasets[1].data = neutralRatios;
+                sentimentRatioChart.data.datasets[2].data = negativeRatios;
+                sentimentRatioChart.update();
+            }
+        }
+    </script>
+</body>
+</html>

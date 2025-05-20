@@ -1,0 +1,48 @@
+jinja2.exceptions.UndefinedError: 'dict object' has no attribute 'Positive'
+
+Traceback (most recent call last)
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\flask\app.py", line 1536, in __call__
+    ) -> cabc.Iterable[bytes]:
+        """The WSGI server calls the Flask application object as the
+        WSGI application. This calls :meth:`wsgi_app`, which can be
+        wrapped to apply middleware.
+        """
+        return self.wsgi_app(environ, start_response)
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\werkzeug\middleware\proxy_fix.py", line 183, in __call__
+return self.app(environ, start_response)
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\flask\app.py", line 1514, in wsgi_app
+response = self.handle_exception(e)
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\flask\app.py", line 1511, in wsgi_app
+response = self.full_dispatch_request()
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\flask\app.py", line 919, in full_dispatch_request
+rv = self.handle_user_exception(e)
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\flask\app.py", line 917, in full_dispatch_request
+rv = self.dispatch_request()
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\flask\app.py", line 902, in dispatch_request
+return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\flask_login\utils.py", line 290, in decorated_view
+return current_app.ensure_sync(func)(*args, **kwargs)
+File "C:\Users\visal\OneDrive\Desktop\Grievance analysis\feedback analysis\new 1\FeedbackTracker\routes.py", line 704, in view_feedback
+return render_template('feedback_view.html',
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\flask\templating.py", line 150, in render_template
+return _render(app, template, context)
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\flask\templating.py", line 131, in _render
+rv = template.render(context)
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\jinja2\environment.py", line 1295, in render
+self.environment.handle_exception()
+File "C:\Users\visal\AppData\Local\Programs\Python\Python310\lib\site-packages\jinja2\environment.py", line 942, in handle_exception
+raise rewrite_traceback_stack(source=source)
+File "C:\Users\visal\OneDrive\Desktop\Grievance analysis\feedback analysis\new 1\FeedbackTracker\templates\feedback_view.html", line 1, in top-level template code
+{% extends 'layout.html' %}
+File "C:\Users\visal\OneDrive\Desktop\Grievance analysis\feedback analysis\new 1\FeedbackTracker\templates\layout.html", line 137, in top-level template code
+{% block content %}{% endblock %}
+File "C:\Users\visal\OneDrive\Desktop\Grievance analysis\feedback analysis\new 1\FeedbackTracker\templates\feedback_view.html", line 245, in block 'content'
+{% set _ = sentiment_counts.update({item.sentiment_label: sentiment_counts[item.sentiment_label] + 1}) %}
+jinja2.exceptions.UndefinedError: 'dict object' has no attribute 'Positive'
+The debugger caught an exception in your WSGI application. You can now look at the traceback which led to the error.
+To switch between the interactive traceback and the plaintext one, you can click on the "Traceback" headline. From the text traceback you can also create a paste of it. For code execution mouse-over the frame you want to debug and click on the console icon on the right side.
+
+You can execute arbitrary Python code in the stack frames and there are some extra helpers available for introspection:
+
+dump() shows all variables in the frame
+dump(obj) dumps all that's known about the object

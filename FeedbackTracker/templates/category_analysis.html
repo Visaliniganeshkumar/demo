@@ -1,0 +1,134 @@
+
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ category.name }} Analysis</h2>
+        <a href="{{ url_for('dashboard_staff') }}" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+    
+    <div class="row">
+        <!-- Rating Analysis -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Rating Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="ratingChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sentiment Analysis -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Sentiment Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="sentimentChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Reviews Container -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Reviews</h5>
+        </div>
+        <div class="card-body">
+            <div id="reviewsContainer"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Rating chart with subcategories
+    const ratingCtx = document.getElementById('ratingChart').getContext('2d');
+    const ratingChart = new Chart(ratingCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ avg_ratings|map(attribute=0)|list|tojson }},
+            datasets: [{
+                label: 'Average Rating',
+                data: {{ avg_ratings|map(attribute=1)|list|tojson }},
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            onClick: function(evt, elements) {
+                if (elements.length > 0) {
+                    const index = elements[0].index;
+                    const question = this.data.labels[index];
+                    showReviewsForQuestion(question);
+                }
+            }
+        }
+    });
+    
+    // Sentiment chart
+    const sentimentCtx = document.getElementById('sentimentChart').getContext('2d');
+    new Chart(sentimentCtx, {
+        type: 'pie',
+        data: {
+            labels: {{ sentiment_counts.keys()|list|tojson }},
+            datasets: [{
+                data: {{ sentiment_counts.values()|list|tojson }},
+                backgroundColor: [
+                    'rgba(75, 192, 192, 0.6)',  // Positive
+                    'rgba(255, 206, 86, 0.6)',  // Neutral
+                    'rgba(255, 99, 132, 0.6)'   // Negative
+                ],
+                borderColor: [
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(255, 99, 132, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            plugins: {
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
+    });
+    
+    function showReviewsForQuestion(question) {
+        const reviewsContainer = document.getElementById('reviewsContainer');
+        const feedback = {{ text_feedback|tojson }};
+        
+        let html = `<h6 class="mb-3">Reviews for: ${question}</h6>`;
+        let found = false;
+        
+        feedback.forEach(review => {
+            if (review.toLowerCase().includes(question.toLowerCase())) {
+                found = true;
+                html += `
+                    <div class="card mb-2">
+                        <div class="card-body">
+                            <p class="mb-0">${review}</p>
+                        </div>
+                    </div>`;
+            }
+        });
+        
+        if (!found) {
+            html += '<p class="text-muted">No specific reviews found for this question.</p>';
+        }
+        
+        reviewsContainer.innerHTML = html;
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,259 @@
+{% extends 'layout.html' %}
+
+{% block title %}Student Dashboard - Feedback Management System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-card {
+        transition: transform 0.3s;
+        height: 100%;
+    }
+    .dashboard-card:hover {
+        transform: translateY(-5px);
+    }
+    .card-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-tachometer-alt me-2"></i> Student Dashboard</h1>
+    <a href="{{ url_for('submit_feedback') }}" class="btn btn-primary">
+        <i class="fas fa-plus-circle me-1"></i> Submit New Feedback
+    </a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title h4 mb-3">Welcome, {{ current_user.username }}!</h2>
+                <p class="lead">
+                    Your feedback helps us improve the educational experience for everyone.
+                </p>
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span><i class="fas fa-id-card me-2"></i> Roll Number:</span>
+                                <span class="fw-bold">{{ current_user.roll_number }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span><i class="fas fa-envelope me-2"></i> Email:</span>
+                                <span class="fw-bold">{{ current_user.email }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span><i class="fas fa-building me-2"></i> Department:</span>
+                                <span class="fw-bold">{{ current_user.department }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <img src="https://pixabay.com/get/g329a7718f92a1b1bf2e95021235432c9195d6dde629ef50853cec67eae9621e9889d99eb9ea67dccb29c69b617f872728e2deffa824f44b91efdb842748836df_1280.jpg" 
+                             alt="Education" class="img-fluid rounded">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4 mt-4 mt-lg-0">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h2 class="card-title h5 mb-0"><i class="fas fa-chart-pie me-2"></i> Feedback Status</h2>
+            </div>
+            <div class="card-body">
+                <div class="text-center">
+                    <div class="py-4">
+                        <canvas id="statusChart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm dashboard-card">
+            <div class="card-body text-center">
+                <div class="card-icon text-primary">
+                    <i class="fas fa-star"></i>
+                </div>
+                <h3 class="h5">Submit Feedback</h3>
+                <p>Provide your valuable feedback on various aspects of the institution.</p>
+                <a href="{{ url_for('submit_feedback') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-plus-circle me-1"></i> New Feedback
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm dashboard-card">
+            <div class="card-body text-center">
+                <div class="card-icon text-info">
+                    <i class="fas fa-search-location"></i>
+                </div>
+                <h3 class="h5">Track Feedback</h3>
+                <p>Check the status of your previously submitted feedback.</p>
+                <a href="{{ url_for('track_feedback') }}" class="btn btn-outline-info">
+                    <i class="fas fa-chart-line me-1"></i> View Status
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm dashboard-card">
+            <div class="card-body text-center">
+                <div class="card-icon text-success">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <h3 class="h5">Direct Message</h3>
+                <p>Contact your CC, HOD, or Principal directly with your concerns.</p>
+                <a href="{{ url_for('direct_message') }}" class="btn btn-outline-success">
+                    <i class="fas fa-envelope me-1"></i> Messages
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="card-title h5 mb-0"><i class="fas fa-history me-2"></i> Recent Feedback</h2>
+                <a href="{{ url_for('track_feedback') }}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_feedback %}
+                    <div class="list-group list-group-flush">
+                        {% for feedback in recent_feedback %}
+                            <a href="{{ url_for('view_feedback', feedback_id=feedback.id) }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">Feedback #{{ feedback.id }}
+                                        {% if feedback.is_anonymous %}
+                                            <span class="anonymous-badge">Anonymous</span>
+                                        {% endif %}
+                                    </h6>
+                                    <small>{{ feedback.submission_date.strftime('%Y-%m-%d %H:%M') }}</small>
+                                </div>
+                                <div class="d-flex w-100 justify-content-between">
+                                    <small>
+                                        Categories: 
+                                        {% for item in feedback.items %}
+                                            <span class="badge bg-secondary me-1">{{ item.category.name }}</span>
+                                        {% endfor %}
+                                    </small>
+                                    {% set latest_response = feedback.responses.first() %}
+                                    {% if latest_response %}
+                                        <span class="status-badge status-{{ latest_response.status }}">{{ latest_response.status }}</span>
+                                    {% else %}
+                                        <span class="status-badge status-pending">Pending</span>
+                                    {% endif %}
+                                </div>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-3x mb-3 text-muted"></i>
+                        <p class="text-muted">You haven't submitted any feedback yet.</p>
+                        <a href="{{ url_for('submit_feedback') }}" class="btn btn-primary">
+                            <i class="fas fa-plus-circle me-1"></i> Submit Feedback
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="card-title h5 mb-0"><i class="fas fa-reply me-2"></i> Recent Responses</h2>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_responses %}
+                    <div class="list-group list-group-flush">
+                        {% for response in recent_responses %}
+                            <a href="{{ url_for('view_feedback', feedback_id=response.feedback_id) }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">Response from {{ response.staff.username }}</h6>
+                                    <small>{{ response.response_date.strftime('%Y-%m-%d %H:%M') }}</small>
+                                </div>
+                                <p class="mb-1 text-truncate">{{ response.response_text }}</p>
+                                <div class="d-flex w-100 justify-content-between">
+                                    <small>Feedback #{{ response.feedback_id }}</small>
+                                    <span class="status-badge status-{{ response.status }}">{{ response.status }}</span>
+                                </div>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-comment-slash fa-3x mb-3 text-muted"></i>
+                        <p class="text-muted">No responses to your feedback yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Simple mock data for status chart - in real app, this would come from server
+    const pendingCount = {{ pending_feedback|length if pending_feedback else 0 }};
+    const acceptedCount = {{ recent_responses|selectattr('status', 'equalto', 'accepted')|list|length }};
+    const resolvedCount = {{ recent_responses|selectattr('status', 'equalto', 'resolved')|list|length }};
+    
+    // Create status chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const statusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Pending', 'Accepted', 'Resolved'],
+            datasets: [{
+                data: [pendingCount, acceptedCount, resolvedCount],
+                backgroundColor: [
+                    'rgba(255, 205, 86, 0.7)',  // Yellow for pending
+                    'rgba(54, 162, 235, 0.7)',  // Blue for accepted
+                    'rgba(75, 192, 192, 0.7)'   // Green for resolved
+                ],
+                borderColor: [
+                    'rgba(255, 205, 86, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(75, 192, 192, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

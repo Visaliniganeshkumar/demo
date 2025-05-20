@@ -1,0 +1,1400 @@
+{% extends 'layout.html' %}
+
+{% block title %}Staff Dashboard - Feedback Management System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .counter-card {
+        border-radius: 15px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+    .counter-card:hover {
+        transform: translateY(-5px);
+    }
+    .chart-container {
+        height: 300px;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i> Staff Dashboard</h1>
+    <div class="d-flex align-items-center">
+        <label for="dateRangeFilter" class="me-2">Time Range:</label>
+        <select id="dateRangeFilter" class="form-select me-2" style="width: auto;">
+            <option value="7" {% if days == 7 %}selected{% endif %}>Last 7 days</option>
+            <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
+            <option value="90" {% if days == 90 %}selected{% endif %}>Last 3 months</option>
+            <option value="180" {% if days == 180 %}selected{% endif %}>Last 6 months</option>
+            <option value="365" {% if days == 365 %}selected{% endif %}>Last year</option>
+        </select>
+        {% if current_user.is_staff() %}
+        <a id="downloadReportBtn" href="{{ url_for('generate_pdf_report') }}?type=full&days={{ days }}" class="btn btn-sm btn-outline-primary">
+            <i class="fas fa-download me-1"></i> Download Full Report
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Overview Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card counter-card border-0 shadow-sm bg-primary bg-gradient h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="counter-icon bg-white text-primary">
+                        <i class="fas fa-comment-dots fa-2x"></i>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="text-white mb-0">Total Feedback</h6>
+                        <h2 class="counter-value text-white mb-0">{{ total_feedback }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card counter-card border-0 shadow-sm bg-warning bg-gradient h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="counter-icon bg-white text-warning">
+                        <i class="fas fa-clock fa-2x"></i>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="text-white mb-0">Pending</h6>
+                        <h2 class="counter-value text-white mb-0">{{ pending_count }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card counter-card border-0 shadow-sm bg-success bg-gradient h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="counter-icon bg-white text-success">
+                        <i class="fas fa-star fa-2x"></i>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="text-white mb-0">Avg. Rating</h6>
+                        <h2 class="counter-value text-white mb-0">
+                            {% if avg_ratings %}
+                                {{ (avg_ratings|map(attribute=1)|sum / avg_ratings|length)|round(1) }}
+                            {% else %}
+                                0.0
+                            {% endif %}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card counter-card border-0 shadow-sm bg-info bg-gradient h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="counter-icon bg-white text-info">
+                        <i class="fas fa-smile fa-2x"></i>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="text-white mb-0">Positive Sentiment</h6>
+                        <h2 class="counter-value text-white mb-0">
+                            {% if sentiment_summary %}
+                                {% set positive_items = sentiment_summary|selectattr('0', 'equalto', 'positive')|list %}
+                                {% set positive_count = positive_items[0][1] if positive_items|length > 0 else 0 %}
+                                {% set total_count = sentiment_summary|map(attribute=1)|sum %}
+                                {% if total_count > 0 %}
+                                    {{ ((positive_count / total_count) * 100)|round|int }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Dashboard Content -->
+<div class="row">
+    <!-- Left Column - Analytics -->
+    <div class="col-lg-8">
+        <!-- Analytics Charts -->
+        <div class="card border-0 shadow-sm mb-4" id="analyticsCharts">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i> Analytics Overview</h5>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshAnalyticsData()">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                    <a href="{{ url_for('download_report') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-download me-1"></i> Download Report
+                    </a>
+                </div>
+            </div>
+            <div class="card-body pb-0">
+                <!-- Filters section -->
+                <div class="mb-4 dashboard-filters">
+                    <div class="card border-0 bg-light">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong><i class="fas fa-filter me-2"></i>Data Filters</strong>
+                                <button type="button" class="btn btn-sm btn-link" data-bs-toggle="collapse" data-bs-target="#filtersCollapse">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="collapse show" id="filtersCollapse">
+                            <div class="card-body">
+                                <form id="analyticsFilterForm" class="row g-3">
+                                    <div class="col-md-3">
+                                        <label for="categoryFilter" class="form-label small">Category</label>
+                                        <select class="form-select form-select-sm" id="categoryFilter">
+                                            <option value="">All Categories</option>
+                                            <!-- Categories will be populated by JavaScript -->
+                                        </select>
+                                    </div>
+                                    <div class="col-md-9">
+                                        <div class="row">
+                                            <div class="col-md-5">
+                                                <label for="fromDateFilter" class="form-label small">From Date</label>
+                                                <input type="date" class="form-control form-control-sm" id="fromDateFilter">
+                                            </div>
+                                            <div class="col-md-5">
+                                                <label for="toDateFilter" class="form-label small">To Date</label>
+                                                <input type="date" class="form-control form-control-sm" id="toDateFilter">
+                                            </div>
+                                            <div class="col-md-2 d-flex align-items-end">
+                                                <button type="button" class="btn btn-sm btn-primary w-100" onclick="loadAnalyticsData()">
+                                                    Apply
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <canvas id="categoryRatingsChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <canvas id="sentimentDistributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container mt-3">
+                    <canvas id="feedbackTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sentiment Trends Analysis -->
+        <div class="card border-0 shadow-sm mb-4" id="sentimentTrends">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i> Sentiment Trends Over Time</h5>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadSentimentTrends()">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </button>
+                    <a href="{{ url_for('generate_pdf_report') }}?type=sentiment&days={{ days }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-download me-1"></i> Download Report
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="chart-container">
+                            <canvas id="sentimentTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="chart-container">
+                            <canvas id="sentimentRatioChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Review Analysis Section -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i> Review Analysis</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="analysis-container">
+                            <h6 class="analysis-header">Rating Distribution</h6>
+                            <canvas id="ratingDistributionChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="analysis-container">
+                            <h6 class="analysis-header">Category Performance</h6>
+                            <canvas id="categoryPerformanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="analysis-container mt-4">
+                    <h6 class="analysis-header">Trend Analysis</h6>
+                    <canvas id="ratingTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Text Analysis Section -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-align-left me-2"></i> Text Analysis</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="analysis-container">
+                            <h6 class="analysis-header">Sentiment Overview</h6>
+                            <canvas id="sentimentChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="analysis-container">
+                            <h6 class="analysis-header">Common Topics</h6>
+                            <div id="topicCloud" style="height: 200px;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="analysis-container mt-4">
+                    <h6 class="analysis-header">Key Insights</h6>
+                    <div id="keyInsights" class="row">
+                        <!-- Insights will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Today's Reviews Section -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i> Today's Reviews</h5>
+        <span class="badge bg-primary">{{ today_feedback|length }} new</span>
+    </div>
+    <div class="card-body p-0">
+        {% if today_feedback %}
+            <div class="list-group list-group-flush">
+                {% for feedback in today_feedback %}
+                    <a href="{{ url_for('view_feedback', feedback_id=feedback.id) }}" 
+                       class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    {% if feedback.is_anonymous %}
+                                        Anonymous Feedback
+                                    {% else %}
+                                        {{ feedback.student.username }}
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted">
+                                    Categories: 
+                                    {% for item in feedback.items %}
+                                        <span class="badge bg-secondary me-1">{{ item.category.name }}</span>
+                                    {% endfor %}
+                                </small>
+                            </div>
+                            <small class="text-muted">{{ feedback.submission_date.strftime('%H:%M') }}</small>
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-calendar-check fa-3x text-muted mb-3"></i>
+                <p class="text-muted mb-0">No reviews submitted today</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Areas for Improvement Section -->
+        <div class="card border-0 shadow-sm mb-4" id="areasImprovement">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i> Areas Needing Improvement</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="loadAreasForImprovement()">
+                    <i class="fas fa-sync-alt me-1"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="improvementAreasContainer">
+                    <div class="d-flex justify-content-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Suggestions Section -->
+        <div class="card border-0 shadow-sm mb-4" id="aiSuggestions">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i> AI-Powered Improvement Suggestions</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="loadAiSuggestions()">
+                    <i class="fas fa-sync-alt me-1"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div id="aiSuggestionsContent" class="p-3">
+                    <div class="d-flex justify-content-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white text-center">
+                    <small class="text-muted">Based on analysis of negative feedback themes</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Today's Feedback -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i> Today's Feedback</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if today_feedback %}
+                    <div class="list-group list-group-flush">
+                        {% for feedback in today_feedback %}
+                            <a href="{{ url_for('view_feedback', feedback_id=feedback.id) }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">Feedback #{{ feedback.id }}
+                                        {% if feedback.is_anonymous %}
+                                            <span class="anonymous-badge">Anonymous</span>
+                                        {% else %}
+                                            <span>from {{ feedback.student.username }}</span>
+                                        {% endif %}
+                                    </h6>
+                                    <small>{{ feedback.submission_date.strftime('%H:%M') }}</small>
+                                </div>
+                                <div class="d-flex w-100 justify-content-between">
+                                    <small>
+                                        Categories: 
+                                        {% for item in feedback.items %}
+                                            <span class="badge bg-secondary me-1">{{ item.category.name }}</span>
+                                        {% endfor %}
+                                    </small>
+                                    {% set latest_response = feedback.responses.first() %}
+                                    {% if latest_response %}
+                                        <span class="status-badge status-{{ latest_response.status }}">{{ latest_response.status }}</span>
+                                    {% else %}
+                                        <span class="status-badge status-pending">pending</span>
+                                    {% endif %}
+                                </div>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-calendar-day fa-3x mb-3 text-muted"></i>
+                        <p class="text-muted">No feedback submissions today.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column - Attention Required -->
+    <div class="col-lg-4">
+        <!-- Unified Communication Center (Messages & Feedback) -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-comments me-2"></i> Communication Center</h5>
+                <div>
+                    {% set unread_count = unread_messages|default(0) %}
+                    {% if unread_count > 0 %}
+                        <span class="badge bg-danger ms-1" id="unreadMessageBadge">{{ unread_count }}</span>
+                    {% endif %}
+                    <button class="btn btn-sm btn-light ms-2" data-bs-toggle="modal" data-bs-target="#newMessageModal">
+                        <i class="fas fa-plus"></i> New Message
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <!-- Communication Tabs -->
+                <ul class="nav nav-tabs nav-fill" id="messageTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="messages-tab" data-bs-toggle="tab" data-bs-target="#messages" 
+                                type="button" role="tab" aria-controls="messages" aria-selected="true">
+                            <i class="fas fa-envelope me-1"></i> Messages 
+                            {% if unread_count > 0 %}
+                                <span class="badge bg-danger">{{ unread_count }}</span>
+                            {% endif %}
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="feedbacks-tab" data-bs-toggle="tab" data-bs-target="#feedbacks" 
+                                type="button" role="tab" aria-controls="feedbacks" aria-selected="false">
+                            <i class="fas fa-comment-dots me-1"></i> Feedback
+                            {% if attention_needed %}
+                                <span class="badge bg-warning ms-1">{{ attention_needed|length }}</span>
+                            {% endif %}
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Communication Center Content -->
+                <div class="tab-content" id="messageTabContent">
+                    <!-- Messages Tab -->
+                    <div class="tab-pane fade show active p-0" id="messages" role="tabpanel" aria-labelledby="messages-tab">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-comment-alt me-2"></i> Communication Center
+                                </h5>
+                                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#newMessageModal">
+                                    <i class="fas fa-plus me-1"></i> New Message
+                                </button>
+                            </div>
+
+                            <div class="message-controls p-2 border-bottom">
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-outline-primary active" id="inbox-btn">
+                                        <i class="fas fa-inbox me-1"></i> Inbox
+                                        {% if unread_count > 0 %}
+                                        <span class="badge bg-danger ms-1">{{ unread_count }}</span>
+                                        {% endif %}
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary" id="sent-btn">
+                                        <i class="fas fa-paper-plane me-1"></i> Sent
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Message List -->
+                            <div class="messages-container p-2" style="max-height: 500px; overflow-y: auto;">
+                                <div id="inbox-messages" class="message-list">
+                                    {% if received_messages %}
+                                        {% for message in received_messages %}
+                                            <div class="card mb-2 message-item border-start border-4 {% if not message.is_read %}border-danger{% else %}border-info{% endif %}" 
+                                                 data-message-id="{{ message.id }}">
+                                                <div class="card-body p-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <span>
+                                                            <strong>{{ message.sender.username }}</strong>
+                                                            {% if not message.is_read %}
+                                                                <span class="badge bg-danger ms-1">New</span>
+                                                            {% endif %}
+                                                        </span>
+                                                        <small class="text-muted">{{ message.sent_date.strftime('%d-%m-%Y %H:%M') }}</small>
+                                                    </div>
+                                                    <p class="mb-1 message-preview">{{ message.message|truncate(60) }}</p>
+
+                                                    <div class="message-full-content d-none">
+                                                        <hr class="my-2">
+                                                        <div class="message-body mb-3">
+                                                            {{ message.message }}
+                                                        </div>
+
+                                                        <div class="d-flex">
+                                                            <button class="btn btn-sm btn-outline-primary me-2 reply-msg-btn" 
+                                                                    data-message-id="{{ message.id }}">
+                                                                <i class="fas fa-reply me-1"></i> Reply
+                                                            </button>
+                                                            <button class="btn btn-sm btn-outline-secondary forward-msg-btn"
+                                                                    data-message-id="{{ message.id }}"
+                                                                    data-message-text="{{ message.message }}"
+                                                                    data-sender="{{ message.sender.username }}">
+                                                                <i class="fas fa-share me-1"></i> Forward
+                                                            </button>
+                                                        </div>
+
+                                                        <!-- Reply form -->
+                                                        <div class="reply-form mt-3 d-none">
+                                                            <form action="{{ url_for('direct_message') }}" method="post" class="quick-reply-form">
+                                                                <input type="hidden" name="recipient_id" value="{{ message.sender.id }}">
+                                                                <div class="form-group">
+                                                                    <textarea class="form-control" name="message" rows="3" 
+                                                                              placeholder="Type your reply here..."></textarea>
+                                                                </div>
+                                                                <div class="d-flex justify-content-end mt-2">
+                                                                    <button type="submit" class="btn btn-sm btn-primary">
+                                                                        <i class="fas fa-paper-plane me-1"></i> Send Reply
+                                                                    </button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="text-muted text-center my-3">No messages in your inbox</p>
+                                    {% endif %}
+                                </div>
+
+                                <div id="sent-messages" class="message-list d-none">
+                                    {% if sent_messages %}
+                                        {% for message in sent_messages %}
+                                            <div class="card mb-2 message-item border-start border-4 border-info"
+                                                 data-message-id="{{ message.id }}">
+                                                <div class="card-body p-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <span>
+                                                            <strong>To: {{ message.recipient.username }}</strong>
+                                                        </span>
+                                                        <small class="text-muted">{{ message.sent_date.strftime('%d-%m-%Y %H:%M') }}</small>
+                                                    </div>
+                                                    <p class="mb-1 message-preview">{{ message.message|truncate(60) }}</p>
+
+                                                    <div class="message-full-content d-none">
+                                                        <hr class="my-2">
+                                                        <div class="message-body mb-3">
+                                                            {{ message.message }}
+                                                        </div>
+
+                                                        <div class="d-flex">
+                                                            <button class="btn btn-sm btn-outline-secondary forward-msg-btn"
+                                                                    data-message-id="{{ message.id }}"
+                                                                    data-message-text="{{ message.message }}"
+                                                                    data-sender="You">
+                                                                <i class="fas fa-share me-1"></i> Forward
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="text-muted text-center my-3">No sent messages</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Feedbacks Tab -->
+                    <div class="tab-pane fade" id="feedbacks" role="tabpanel" aria-labelledby="feedbacks-tab">
+                        {% if attention_needed %}
+                            <div class="list-group list-group-flush">
+                                {% for feedback in attention_needed %}
+                                    <div class="list-group-item feedback-card" data-feedback-id="{{ feedback.id }}">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1">Feedback #{{ feedback.id }}</h6>
+                                            <small>{{ feedback.submission_date.strftime('%Y-%m-%d') }}</small>
+                                        </div>
+                                        <p class="mb-1 text-truncate">
+                                            {% if not feedback.is_anonymous %}
+                                                From: {{ feedback.student.username }}
+                                            {% else %}
+                                                <span class="badge bg-secondary">Anonymous</span>
+                                            {% endif %}
+                                        </p>
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <small>
+                                                Categories: 
+                                                {% for item in feedback.items %}
+                                                    <span class="badge bg-secondary me-1">{{ item.category.name }}</span>
+                                                {% endfor %}
+                                            </small>
+                                            <span class="status-badge status-pending">pending</span>
+                                        </div>
+
+                                        <div class="feedback-actions mt-2">
+                                            <div class="btn-group btn-group-sm status-button-group">
+                                                <button type="button" class="btn btn-outline-success status-btn" data-action="noted">
+                                                    <i class="fas fa-check me-1"></i> Note
+                                                </button>
+                                                <button type="button" class="btn btn-outline-primary status-btn" data-action="accepted">
+                                                    <i class="fas fa-thumbs-up me-1"></i> Accept
+                                                </button>
+                                                <button type="button" class="btn btn-outline-info status-btn" data-action="forward">
+                                                    <i class="fas fa-share me-1"></i> Forward
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="feedback-content d-none mt-3">
+                                            <div class="card">
+                                                <div class="card-body">
+                                                    <h6 class="card-subtitle mb-2 text-muted">Feedback Details</h6>
+                                                    {% for item in feedback.items %}
+                                                        <div class="mb-3">
+                                                            <strong>{{ item.category.name }}</strong>
+                                                            <p>{{ item.text_feedback }}</p>
+                                                            {% if item.ratings.count() > 0 %}
+                                                                <div class="ratings">
+                                                                    {% for rating in item.ratings %}
+                                                                        <div><small>{{ rating.question.text }}: {{ rating.rating_value }}/5</small></div>
+                                                                    {% endfor %}
+                                                                </div>
+                                                            {% endif %}
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                            <div class="feedback-reply-form mt-2 d-none">
+                                                <form class="feedback-response-form">
+                                                    <input type="hidden" name="feedback_id" value="{{ feedback.id }}">
+                                                    <textarea class="form-control mb-2" name="response_text" rows="2" 
+                                                              placeholder="Type your response..."></textarea>
+                                                    <div class="d-flex justify-content-between">
+                                                        <select class="form-select form-select-sm me-2" name="response_status" style="width: auto;">
+                                                            <option value="noted">Noted</option>
+                                                            <option value="accepted">Accepted</option>
+                                                            <option value="pending">Pending</option>
+                                                        </select>
+                                                        <button type="submit" class="btn btn-sm btn-primary">
+                                                            <i class="fas fa-paper-plane me-1"></i> Send Response
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-5">
+                                <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+                                <p class="text-muted">No pending feedback requiring your attention.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Profile -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-user-circle me-2"></i> Your Profile</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="flex-shrink-0">
+                        <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" 
+                             style="width: 60px; height: 60px; font-size: 1.5rem;">
+                            {{ current_user.username|truncate(1, True, '') }}
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        <h5 class="mb-0">{{ current_user.username }}</h5>
+                        <p class="text-muted mb-0">
+                            {% if current_user.is_cc() %}
+                                <span class="badge bg-info">Class Coordinator</span>
+                            {% elif current_user.is_hod() %}
+                                <span class="badge bg-warning">Head of Department</span>
+                            {% elif current_user.is_principal() %}
+                                <span class="badge bg-danger">Principal</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <p class="mb-0"><strong>Department:</strong> {{ current_user.department }}</p>
+                    <p class="mb-0"><strong>Email:</strong> {{ current_user.email }}</p>
+                </div>
+                {% if current_user.is_cc() %}
+                    <div class="d-grid">
+                        <a href="{{ url_for('manage_students') }}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-user-graduate me-1"></i> Manage Students
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Areas for Improvement (CC only) -->
+        {% if current_user.is_cc() %}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="fas fa-wrench me-2"></i> Areas for Improvement</h5>
+            </div>
+            <div class="card-body p-0">
+                <div id="areasForImprovement" class="p-3">
+                    <div class="d-flex justify-content-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white text-center">
+                    <small class="text-muted">Based on recent feedback sentiment analysis</small>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+<!-- New Message Modal -->
+<div class="modal fade" id="newMessageModal" tabindex="-1" aria-labelledby="newMessageModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="newMessageModalLabel">New Message</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('direct_message') }}" id="newMessageForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="modal_recipient_id" class="form-label">Recipient</label>
+                        <select class="form-select" id="modal_recipient_id" name="recipient_id" required>
+                            <option value="" selected disabled>Select Recipient</option>
+                            {% for recipient in recipients|default([]) %}
+                                <option value="{{ recipient.id }}">
+                                    {{ recipient.username }}
+                                    {% if recipient.is_student() %}
+                                        (Student)
+                                    {% elif recipient.is_cc() %}
+                                        (Class Coordinator)
+                                    {% elif recipient.is_hod() %}
+                                        (HOD)
+                                    {% elif recipient.is_principal() %}
+                                        (Principal)
+                                    {% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modal_message" class="form-label">Message</label>
+                        <textarea class="form-control" id="modal_message" name="message" rows="5" required
+                                  placeholder="Type your message here..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane me-1"></i> Send Message
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Forward Message Modal -->
+<div class="modal fade" id="forwardMessageModal" tabindex="-1" aria-labelledby="forwardMessageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="forwardMessageModalLabel">
+                    <i class="fas fa-share me-2"></i> Forward Message
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('direct_message') }}" id="forwardMessageForm">
+                <div class="modal-body">
+                    <!-- Message Tracking Timeline -->
+                    <div class="mb-4" id="message-tracking-container">
+                        <h6 class="border-bottom pb-2 mb-3">Message Tracking</h6>
+                        <div class="message-timeline mb-3">
+                            <div class="timeline-container position-relative">
+                                <!-- Timeline will be populated by JavaScript -->
+                                <div id="message-timeline-content" class="ps-4 position-relative">
+                                    <div class="timeline-line position-absolute" style="top: 0; bottom: 0; left: 10px; width: 2px; background-color: #dee2e6;"></div>
+                                    <div id="message-forwarding-chain">
+                                        <!-- Will be populated with forwarding chain -->
+                                    </div>
+                                    <div class="timeline-item d-flex align-items-center mb-3 position-relative">
+                                        <div class="timeline-marker position-absolute start-0 rounded-circle mt-0" style="width: 16px; height: 16px; margin-left: -8px; background-color: var(--bs-primary);"></div>
+                                        <div class="timeline-content ms-3">
+                                            <p class="mb-0"><strong>Original Message</strong></p>
+                                            <p class="text-muted mb-0 small">From: <span id="timelineOriginalSender"></span></p>
+                                        </div>
+                                    </div>
+                                    <div class="timeline-item d-flex align-items-center position-relative">
+                                        <div class="timeline-marker position-absolute start-0 rounded-circle mt-0" style="width: 16px; height: 16px; margin-left: -8px; background-color: var(--bs-info);"></div>
+                                        <div class="timeline-content ms-3">
+                                            <p class="mb-0"><strong>You are forwarding</strong></p>
+                                            <p class="text-muted mb-0 small">Select recipient below</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Original Message</label>
+                        <div class="alert alert-light border">
+                            <div class="d-flex justify-content-between">
+                                <p class="mb-1"><strong>From: <span id="originalSender"></span></strong></p>
+                                <small class="text-muted" id="originalTimestamp"></small>
+                            </div>
+                            <hr class="my-2">
+                            <div class="message-content" id="originalMessageText"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="forward_recipient_id" class="form-label">Forward To</label>
+                        <select class="form-select" id="forward_recipient_id" name="recipient_id" required>
+                            <option value="" selected disabled>Select Recipient</option>
+                            {% for recipient in recipients|default([]) %}
+                                <option value="{{ recipient.id }}">
+                                    {{ recipient.username }}
+                                    {% if recipient.is_student() %}
+                                        (Student)
+                                    {% elif recipient.is_cc() %}
+                                        (Class Coordinator)
+                                    {% elif recipient.is_hod() %}
+                                        (HOD)
+                                    {% elif recipient.is_principal() %}
+                                        (Principal)
+                                    {% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="forward_message" class="form-label">Your Comments</label>
+                        <textarea class="form-control" id="forward_message" name="message" rows="4" required
+                                  placeholder="Add your comments before forwarding..."></textarea>
+                        <input type="hidden" id="original_message_id" name="original_message_id">
+                        <small class="form-text text-muted">
+                            The original message will be included automatically when forwarded.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-share me-1"></i> Forward Message
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Forward Feedback Modal -->
+<div class="modal fade" id="forwardFeedbackModal" tabindex="-1" aria-labelledby="forwardFeedbackModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="forwardFeedbackModalLabel">Forward Feedback</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('respond_to_feedback', feedback_id=0) }}" id="forwardFeedbackForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="forward_to" class="form-label">Forward To</label>
+                        <select class="form-select" id="forward_to" name="forward_to" required>
+                            <option value="" selected disabled>Select Staff Member</option>
+                            {% for staff in staff_members|default([]) %}
+                                <option value="{{ staff.id }}">
+                                    {{ staff.username }}
+                                    {% if staff.is_cc() %}
+                                        (Class Coordinator)
+                                    {% elif staff.is_hod() %}
+                                        (HOD)
+                                    {% elif staff.is_principal() %}
+                                        (Principal)
+                                    {% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="response_text" class="form-label">Comments for Forwarding</label>
+                        <textarea class="form-control" id="response_text" name="response_text" rows="3"
+                                  placeholder="Add your comments when forwarding..."></textarea>
+                        <input type="hidden" id="feedback_id" name="feedback_id" value="">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-share me-1"></i> Forward Feedback
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+    // Helper function to get CSRF token from meta tag
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
+    // Function to load and display message forwarding chain
+    function loadMessageForwardingChain(messageId) {
+        // Clear existing chain items
+        const chainContainer = document.getElementById('message-forwarding-chain');
+        if (!chainContainer) return;
+
+        chainContainer.innerHTML = '';
+
+        // For now, we'll implement this with a mock chain
+        // In a future update, this should fetch the actual forwarding chain from the server
+
+        // This function would fetch from an API endpoint like:
+        // fetch(`/api/message_chain/${messageId}`)
+        //   .then(response => response.json())
+        //   .then(data => { ... build the chain visualization ... })
+
+        // For demonstration, we'll show a static chain with timestamps
+        const mockChain = [
+            // Chain items would come from server, showing all previous forwards
+            // Example: { sender: "Person A", recipient: "Person B", date: "2023-01-01 12:00" }
+        ];
+
+        // If we have chain items, show them in timeline
+        mockChain.forEach((item, index) => {
+            const timelineItem = document.createElement('div');
+            timelineItem.className = 'timeline-item d-flex align-items-center mb-3 position-relative';
+            timelineItem.innerHTML = `
+                <div class="timeline-marker position-absolute start-0 rounded-circle mt-0" 
+                     style="width: 16px; height: 16px; margin-left: -8px; background-color: var(--bs-secondary);"></div>
+                <div class="timeline-content ms-3">
+                    <p class="mb-0"><strong>Forwarded</strong></p>
+                    <p class="text-muted mb-0 small">From: ${item.sender} to ${item.recipient}</p>
+                    <p class="text-muted mb-0 small">${item.date}</p>
+                </div>
+            `;
+            chainContainer.appendChild(timelineItem);
+        });
+    }
+
+    // Helper function to show toast notifications
+    function showToast(message, type = 'info') {
+        // Create toast element if it doesn't exist
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(toastContainer);
+        }
+
+        const toastId = 'toast-' + Date.now();
+        const toast = document.createElement('div');
+        toast.className = `toast bg-${type} text-white`;
+        toast.id = toastId;
+        toast.innerHTML = `
+            <div class="toast-header bg-${type} text-white">
+                <strong class="me-auto">Notification</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        `;
+
+        toastContainer.appendChild(toast);
+
+        const bsToast = new bootstrap.Toast(toast, { autohide: true, delay: 3000 });
+        bsToast.show();
+
+        // Remove toast after it's hidden
+        toast.addEventListener('hidden.bs.toast', function() {
+            toast.remove();
+        });
+    }
+
+    // Update unread message count in UI
+    function updateUnreadCount() {
+        const unreadItems = document.querySelectorAll('.message-item.border-danger').length;
+        const badges = document.querySelectorAll('.badge.bg-danger');
+
+        badges.forEach(badge => {
+            if (badge.closest('#messages-tab')) {
+                if (unreadItems > 0) {
+                    badge.textContent = unreadItems;
+                    badge.classList.remove('d-none');
+                } else {
+                    badge.classList.add('d-none');
+                }
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize and load charts
+        initializeCharts();
+        loadAnalyticsData();
+        loadSentimentTrends();
+        loadAreasForImprovement();
+        loadAiSuggestions();
+
+        // Set up the unified communication center
+        setupCommunicationCenter();
+
+        function setupCommunicationCenter() {
+            // Inbox/Sent toggle for messages
+            const inboxBtn = document.getElementById('inbox-btn');
+            const sentBtn = document.getElementById('sent-btn');
+            const inboxMessages = document.getElementById('inbox-messages');
+            const sentMessages = document.getElementById('sent-messages');
+
+            if (inboxBtn && sentBtn) {
+                inboxBtn.addEventListener('click', function() {
+                    inboxBtn.classList.add('active');
+                    sentBtn.classList.remove('active');
+                    inboxMessages.classList.remove('d-none');
+                    sentMessages.classList.add('d-none');
+                });
+
+                sentBtn.addEventListener('click', function() {
+                    sentBtn.classList.add('active');
+                    inboxBtn.classList.remove('active');
+                    sentMessages.classList.remove('d-none');
+                    inboxMessages.classList.add('d-none');
+                });
+            }
+
+            // Message item clicking (expand to show full message)
+            const messageItems = document.querySelectorAll('.message-item');
+            messageItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const messageId = this.dataset.messageId;
+                    const fullContent = this.querySelector('.message-full-content');
+
+                    if (fullContent) {
+                        if (fullContent.classList.contains('d-none')) {
+                            fullContent.classList.remove('d-none');
+
+                            // Mark as read if it was unread
+                            if (this.classList.contains('border-danger')) {
+                                fetch(`/api/mark_message_read/${messageId}`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRFToken': getCsrfToken()
+                                    }
+                                }).then(response => {
+                                    if (response.ok) {
+                                        this.classList.remove('border-danger');
+                                        this.classList.add('border-info');
+                                        const badgeElem = this.querySelector('.badge.bg-danger');
+                                        if (badgeElem) badgeElem.remove();
+
+                                        // Update unread count in the UI
+                                        updateUnreadCount();
+                                    }
+                                });
+                            }
+                        } else {
+                            fullContent.classList.add('d-none');
+                        }
+                    }
+                });
+            });
+
+            // Reply buttons
+            document.querySelectorAll('.reply-msg-btn').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Prevent triggering the message item click
+
+                    const messageItem = this.closest('.message-item');
+                    const replyForm = messageItem.querySelector('.reply-form');
+
+                    if (replyForm) {
+                        replyForm.classList.toggle('d-none');
+
+                        if (!replyForm.classList.contains('d-none')) {
+                            const textarea = replyForm.querySelector('textarea');
+                            if (textarea) {
+                                textarea.focus();
+                            }
+                        }
+                    }
+                });
+            });
+
+            // Submit quick reply form via AJAX
+            document.querySelectorAll('.quick-reply-form').forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const formData = new FormData(this);
+
+                    fetch(this.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': getCsrfToken()
+                        }
+                    }).then(response => {
+                        if (response.ok) {
+                            showToast('Reply sent successfully', 'success');
+
+                            // Clear the form and hide it
+                            this.reset();
+                            this.closest('.reply-form').classList.add('d-none');
+
+                            // Add the reply to the sent messages
+                            setTimeout(() => {
+                                sentBtn.click();
+                                setTimeout(() => {
+                                    showToast('View your sent message', 'info');
+                                }, 500);
+                            }, 1000);
+                        } else {
+                            showToast('Failed to send reply', 'danger');
+                        }
+                    });
+                });
+            });
+
+            // Forward buttons
+            document.querySelectorAll('.forward-msg-btn').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Prevent triggering the message item click
+
+                    const messageId = this.dataset.messageId;
+                    const messageText = this.dataset.messageText;
+                    const sender = this.dataset.sender;
+
+                    // Fill the forward modal
+                    const forwardModal = new bootstrap.Modal(document.getElementById('forwardMessageModal'));
+
+                    // Update the message tracking timeline
+                    document.getElementById('timelineOriginalSender').textContent = sender;
+
+                    // Set the message content
+                    document.getElementById('originalSender').textContent = sender;
+                    document.getElementById('timelineOriginalSender').textContent = sender;
+                    document.getElementById('originalTimestamp').textContent = new Date().toLocaleString();
+                    document.getElementById('originalMessageText').textContent = messageText;
+                    document.getElementById('original_message_id').value = messageId;
+
+                    // Prepare forward message with appropriate format
+                    document.getElementById('forward_message').value = '';
+
+                    // Load the message forwarding chain
+                    loadMessageForwardingChain(messageId);
+
+                    forwardModal.show();
+                });
+            });
+
+            // Quick respond buttons for feedback
+            document.querySelectorAll('.quick-respond-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const feedbackId = this.dataset.feedbackId;
+                    const status = this.dataset.status;
+
+                    // Create form data
+                    const formData = new FormData();
+                    formData.append('status', status);
+
+                    let responseText = '';
+                    if (status === 'accepted') {
+                        responseText = 'Thank you for your feedback. We have accepted it for review.';
+                    } else if (status === 'noted') {
+                        responseText = 'Your feedback has been noted. Thank you for sharing your thoughts.';
+                    }
+
+                    formData.append('response', responseText);
+
+                    // Send quick response
+                    fetch(`/respond_to_feedback/${feedbackId}`, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': getCsrfToken()
+                        }
+                    }).then(response => {
+                        if (response.ok) {
+                            showToast('Response submitted successfully', 'success');
+                            // Update the status badge
+                            const feedbackItem = this.closest('.feedback-item');
+                            const statusBadge = feedbackItem.querySelector('.status-badge');
+                            if (statusBadge) {
+                                statusBadge.className = `status-badge status-${status}`;
+                                statusBadge.textContent = status;
+                            }
+                        } else {
+                            showToast('Failed to submit response', 'danger');
+                        }
+                    });
+                });
+            });
+
+            // Quick forward buttons for feedback
+            document.querySelectorAll('.quick-forward-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const feedbackId = this.dataset.feedbackId;
+                    window.location.href = `/view_feedback/${feedbackId}#forward-section`;
+                });
+            });
+
+            // New Message button 
+            const newMessageBtn = document.querySelector('[data-bs-target="#newMessageModal"]');
+            if (newMessageBtn) {
+                newMessageBtn.addEventListener('click', function() {
+                    const newMessageModal = new bootstrap.Modal(document.getElementById('newMessageModal'));
+                    newMessageModal.show();
+                });
+            }
+
+            // Message item clicking (expand to show full message)
+            const messageItems = document.querySelectorAll('.message-item');
+            messageItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const messageId = this.dataset.messageId;
+                    const contentFull = this.querySelector('.message-content-full');
+                    const messageActions = this.querySelector('.message-actions');
+
+                    // Toggle full message content visibility
+                    if (contentFull.classList.contains('d-none')) {
+                        contentFull.classList.remove('d-none');
+                        messageActions.classList.remove('d-none');
+
+                        // Mark as read via AJAX if unread
+                        if (this.classList.contains('message-unread')) {
+                            fetch(`/api/mark_message_read/${messageId}`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' }
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    this.classList.remove('message-unread');
+                                    const newBadge = this.querySelector('.badge.bg-danger');
+                                    if (newBadge) newBadge.remove();
+
+                                    // Update unread badge count
+                                    updateUnreadBadgeCount();
+                                }
+                            });
+                        }
+                    } else {
+                        contentFull.classList.add('d-none');
+                        messageActions.classList.add('d-none');
+                    }
+                });
+            });
+
+            // Handle reply buttons
+            const replyButtons = document.querySelectorAll('.message-reply-btn');
+            replyButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Prevent parent click
+                    const messageCard = this.closest('.message-item');
+                    const replyForm = messageCard.querySelector('.message-reply-form');
+
+                    // Toggle reply form
+                    if (replyForm.classList.contains('d-none')) {
+                        replyForm.classList.remove('d-none');
+                        replyForm.querySelector('textarea').focus();
+                    } else {
+                        replyForm.classList.add('d-none');
+                    }
+                });
+            });
+
+            // Handle forward buttons
+            const forwardButtons = document.querySelectorAll('.message-forward-btn');
+            forwardButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Prevent parent click
+
+                    // Set modal content
+                    const messageId = this.dataset.messageId;
+                    const messageText = this.dataset.messageText;
+                    const sender = this.dataset.sender;
+
+                    document.getElementById('originalSender').textContent = sender;
+                    document.getElementById('originalMessageText').textContent = messageText;
+                    document.getElementById('original_message_id').value = messageId;
+                    document.getElementById('forward_message').value = `Forwarded message from ${sender}:\n\n${messageText}\n\n`;
+
+                    // Show modal
+                    const forwardModal = new bootstrap.Modal(document.getElementById('forwardMessageModal'));
+                    forwardModal.show();
+                });
+            });
+
+            // Feedback card interactions
+            const feedbackCards = document.querySelectorAll('.feedback-card');
+            feedbackCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const feedbackContent = this.querySelector('.feedback-content');
+
+                    // Toggle feedback content
+                    if (feedbackContent.classList.contains('d-none')) {
+                        feedbackContent.classList.remove('d-none');
+                    } else {
+                        feedbackContent.classList.add('d-none');
+                    }
+                });
+
+                // Status buttons
+                const statusButtons = card.querySelectorAll('.status-btn');
+                statusButtons.forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const action = this.dataset.action;
+                        const feedbackId = card.dataset.feedbackId;
+
+                        if (action === 'forward') {
+                            // Show forward modal
+                            document.getElementById('feedback_id').value = feedbackId;
+                            const forwardFeedbackUrl = '{{ url_for("respond_to_feedback", feedback_id=0) }}'.replace('0', feedbackId);
+                            document.getElementById('forwardFeedbackForm').action = forwardFeedbackUrl;
+
+                            const forwardModal = new bootstrap.Modal(document.getElementById('forwardFeedbackModal'));
+                            forwardModal.show();
+                        } else {
+                            // Show reply form for other actions
+                            const replyForm = card.querySelector('.feedback-reply-form');
+                            const statusSelect = replyForm.querySelector('select[name="response_status"]');
+
+                            // Set the selected status based on clicked button
+                            statusSelect.value = action;
+
+                            // Show the form
+                            replyForm.classList.remove('d-none');
+                            replyForm.querySelector('textarea').focus();
+                        }
+                    });
+                });
+            });
+        }
+
+        // Helper function to update unread badge count
+        function updateUnreadBadgeCount() {
+            const unreadItems = document.querySelectorAll('.message-unread').length;
+            const unreadBadge = document.getElementById('unreadMessageBadge');
+            const tabBadge = document.querySelector('#inbox-tab .badge');
+
+            if (unreadItems <= 0) {
+                if (unreadBadge) unreadBadge.remove();
+                if (tabBadge) tabBadge.remove();
+            } else {
+                if (unreadBadge) unreadBadge.textContent = unreadItems;
+                if (tabBadge) tabBadge.textContent = unreadItems;
+            }
+        }
+    });
+</script>
+{% endblock %}

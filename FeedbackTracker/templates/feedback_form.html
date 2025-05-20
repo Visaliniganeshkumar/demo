@@ -1,0 +1,261 @@
+{% extends 'layout.html' %}
+
+{% block title %}Submit Feedback - Feedback Management System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .star-label {
+        transition: all 0.2s ease;
+    }
+    .star-hover {
+        transform: scale(1.2);
+    }
+    .star-checked {
+        animation: star-pulse 0.4s 1;
+    }
+    .category-card {
+        margin-bottom: 2rem;
+        transition: all 0.3s ease;
+    }
+    .category-card:hover {
+        transform: translateY(-5px);
+    }
+    .rating-description {
+        font-size: 0.9rem;
+        min-height: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-10">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1><i class="fas fa-star me-2"></i> Submit Feedback</h1>
+                <a href="{{ url_for('dashboard_student') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+                </a>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5>Your feedback is valuable!</h5>
+                            <p>Rate various aspects of your educational experience and provide comments to help us improve.</p>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check-circle text-success me-2"></i> Rate on a scale of 1-5 stars</li>
+                                <li><i class="fas fa-check-circle text-success me-2"></i> Add optional text feedback for each category</li>
+                                <li><i class="fas fa-check-circle text-success me-2"></i> Submit anonymously if you prefer</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <img src="https://pixabay.com/get/g87d271d8b83f99a6da6fbc644932379bd9e1ddfae208d471a71a85c59c64e57d477daaf3c9d7868baa40d9095f5382edf1c2e2d511e4304a06d72c7bbdad7c61_1280.jpg" 
+                                 alt="Feedback form" class="img-fluid rounded img-hero">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form id="feedbackForm" method="POST" action="{{ url_for('submit_feedback') }}">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <!-- Anonymous Option -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="anonymousFeedback" name="anonymous">
+                            <label class="form-check-label" for="anonymousFeedback">
+                                <strong>Submit anonymously</strong> - Your identity will not be revealed to staff members
+                            </label>
+                        </div>
+                        <div id="anonymousWarning" class="alert alert-warning mt-2 d-none">
+                            <i class="fas fa-info-circle me-2"></i>
+                            While your identity will be hidden from staff, you can still track your feedback status.
+                        </div>
+
+                        <hr class="my-3">
+
+                        <h5 class="mb-3">Select categories to provide feedback on:</h5>
+                        <div class="row">
+                            {% for category in categories %}
+                                <div class="col-md-6 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input category-selector" 
+                                               type="radio" 
+                                               id="select_category_{{ category.id }}" 
+                                               name="selected_categories" 
+                                               value="{{ category.id }}"
+                                               data-category-name="{{ category.name|lower|replace(' ', '') }}"
+                                               required>
+                                        <label class="form-check-label" for="select_category_{{ category.id }}">
+                                            {{ category.name }}
+                                        </label>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            You can choose which categories to provide feedback on. The "Other" category is always available for additional comments.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feedback Categories -->
+                {% for category in categories %}
+                    <div class="card border-0 shadow-sm category-card category-{{ category.name|lower|replace(' ', '') }}">
+                        <div class="card-header">
+                            <h3 class="h5 mb-0">{{ category.name }}</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-4">{{ category.description }}</p>
+
+                            <!-- Submit button for this category -->
+                                <div class="text-end mb-3">
+                                    <button type="submit" class="btn btn-primary" name="submit_category" value="{{ category.id }}">
+                                        <i class="fas fa-paper-plane me-2"></i> Submit {{ category.name }} Feedback
+                                    </button>
+                                </div>
+                                <!-- Rating Questions -->
+                                {% for question in category.questions %}
+                                    <div class="mb-4">
+                                        <label class="form-label">{{ question.text }}</label>
+                                        <div class="d-flex align-items-center mb-2">
+                                            <div class="star-rating me-3" 
+                                                 id="rating_container_{{ question.id }}" 
+                                                 data-question-id="{{ question.id }}"
+                                                 data-display-id="rating_value_{{ question.id }}"
+                                                 data-description-id="rating_description_{{ question.id }}">
+
+                                                <input type="radio" id="star5_{{ question.id }}" name="rating_{{ question.id }}" value="5"/>
+                                                <label for="star5_{{ question.id }}" class="star-label" title="Excellent"></label>
+
+                                                <input type="radio" id="star4_{{ question.id }}" name="rating_{{ question.id }}" value="4" />
+                                                <label for="star4_{{ question.id }}" class="star-label" title="Very Good"></label>
+
+                                                <input type="radio" id="star3_{{ question.id }}" name="rating_{{ question.id }}" value="3" />
+                                                <label for="star3_{{ question.id }}" class="star-label" title="Good"></label>
+
+                                                <input type="radio" id="star2_{{ question.id }}" name="rating_{{ question.id }}" value="2" />
+                                                <label for="star2_{{ question.id }}" class="star-label" title="Fair"></label>
+
+                                                <input type="radio" id="star1_{{ question.id }}" name="rating_{{ question.id }}" value="1" />
+                                                <label for="star1_{{ question.id }}" class="star-label" title="Poor"></label>
+                                            </div>
+
+                                            <div>
+                                                <span class="badge bg-primary" id="rating_value_{{ question.id }}">0</span>
+                                                <span class="ms-2 rating-description" id="rating_description_{{ question.id }}"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+
+                            <!-- Text Feedback -->
+                            <div class="mb-3">
+                                <label for="text_{{ category.id }}" class="form-label">
+                                    {% if category.name == "Other" %}
+                                        Any other feedback or suggestions?
+                                    {% else %}
+                                        Additional comments about {{ category.name }} (optional):
+                                    {% endif %}
+                                </label>
+                                <textarea class="form-control" id="text_{{ category.id }}" name="text_{{ category.id }}" rows="3"
+                                          {% if category.name == "Other" %}placeholder="Enter any other feedback that doesn't fit into the categories above"{% endif %}></textarea>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+
+                <!-- Submit Button -->
+                <div class="text-center mb-5 mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg px-5">
+                        <i class="fas fa-paper-plane me-2"></i> Submit Feedback
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/star_rating.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle anonymous checkbox
+        const anonymousCheck = document.getElementById('anonymousFeedback');
+        const anonymousWarning = document.getElementById('anonymousWarning');
+
+        anonymousCheck.addEventListener('change', function() {
+            if (this.checked) {
+                anonymousWarning.classList.remove('d-none');
+            } else {
+                anonymousWarning.classList.add('d-none');
+            }
+        });
+
+        // Handle category selection
+        const categorySelectors = document.querySelectorAll('.category-selector');
+        const otherCategory = document.querySelector('.category-other');
+
+        // Initially hide all category cards except "Other"
+        document.querySelectorAll('.category-card').forEach(card => {
+            if (!card.classList.contains('category-other')) {
+                card.style.display = 'none';
+            }
+        });
+
+        // Show selected categories
+        categorySelectors.forEach(selector => {
+            selector.addEventListener('change', function() {
+                const categoryName = this.dataset.categoryName;
+                const categoryCard = document.querySelector(`.category-${categoryName}`);
+
+                if (this.checked) {
+                    categoryCard.style.display = 'block';
+                    // Smooth scroll to the card
+                    setTimeout(() => {
+                        categoryCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                } else {
+                    categoryCard.style.display = 'none';
+                }
+            });
+        });
+
+        // Form submission validation
+    const feedbackForm = document.getElementById('feedbackForm');
+    feedbackForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const selectedCategories = document.querySelectorAll('.category-selector:checked');
+    const textFeedbacks = document.querySelectorAll('textarea');
+
+    let hasContent = false;
+
+    if (selectedCategories.length > 0) {
+        hasContent = true;
+    }
+
+    textFeedbacks.forEach(textarea => {
+        if (textarea.id.includes('text_') && textarea.value.trim() !== '') {
+            hasContent = true;
+        }
+    });
+
+    if (!hasContent) {
+        e.preventDefault();
+        alert('Please select at least one category or provide feedback in the "Other" section.');
+    }
+    // Allow form submission if validation passes
+    else {
+        feedbackForm.submit();
+    }
+    });
+
+</script>
+{% endblock %}

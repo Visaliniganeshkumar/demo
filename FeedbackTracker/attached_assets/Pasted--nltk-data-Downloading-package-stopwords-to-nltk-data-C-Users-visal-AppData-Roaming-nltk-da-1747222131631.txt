@@ -1,0 +1,59 @@
+[nltk_data] Downloading package stopwords to
+[nltk_data]     C:\Users\visal\AppData\Roaming\nltk_data...
+[nltk_data]   Package stopwords is already up-to-date!
+[nltk_data] Downloading package wordnet to
+[nltk_data]     C:\Users\visal\AppData\Roaming\nltk_data...
+[nltk_data]   Package wordnet is already up-to-date!
+PS C:\Users\visal\OneDrive\Desktop\Grievance analysis\FeedbackTracker> python main.py  
+ERROR:app:Error creating database tables: (sqlite3.OperationalError) unable to open database file
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:bert_analysis:Downloading NLTK resources...
+[nltk_data] Downloading package punkt to
+[nltk_data]     C:\Users\visal\AppData\Roaming\nltk_data...
+[nltk_data]   Package punkt is already up-to-date!
+[nltk_data] Downloading package stopwords to
+[nltk_data]     C:\Users\visal\AppData\Roaming\nltk_data...
+[nltk_data]   Package stopwords is already up-to-date!
+[nltk_data] Downloading package wordnet to
+[nltk_data]     C:\Users\visal\AppData\Roaming\nltk_data...
+[nltk_data]   Package wordnet is already up-to-date!
+Python version: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+Current directory: C:\Users\visal\OneDrive\Desktop\Grievance analysis\FeedbackTracker
+Database URL: sqlite:///instance/feedback_system.db
+App is configured and ready to initialize
+INFO:routes:Starting database initialization
+ERROR:routes:Error initializing database: (sqlite3.OperationalError) unable to open database file
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Database initialization completed
+Server ready to start
+ * Serving Flask app 'app'
+ * Debug mode: on
+INFO:werkzeug:WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.79.8:5000
+INFO:werkzeug:Press CTRL+C to quit
+INFO:werkzeug: * Restarting with watchdog (windowsapi)
+ERROR:app:Error creating database tables: (sqlite3.OperationalError) unable to open database file
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:bert_analysis:Downloading NLTK resources...
+[nltk_data] Downloading package punkt to
+[nltk_data]     C:\Users\visal\AppData\Roaming\nltk_data...
+[nltk_data]   Package punkt is already up-to-date!
+[nltk_data] Downloading package stopwords to
+[nltk_data]     C:\Users\visal\AppData\Roaming\nltk_data...
+[nltk_data]   Package stopwords is already up-to-date!
+[nltk_data] Downloading package wordnet to
+[nltk_data]     C:\Users\visal\AppData\Roaming\nltk_data...
+[nltk_data]   Package wordnet is already up-to-date!
+Python version: 3.10.0 (tags/v3.10.0:b494f59, Oct  4 2021, 19:00:18) [MSC v.1929 64 bit (AMD64)]
+Current directory: C:\Users\visal\OneDrive\Desktop\Grievance analysis\FeedbackTracker
+Database URL: sqlite:///instance/feedback_system.db
+App is configured and ready to initialize
+INFO:routes:Starting database initialization
+ERROR:routes:Error initializing database: (sqlite3.OperationalError) unable to open database file
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Database initialization completed
+Server ready to start
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 143-132-680

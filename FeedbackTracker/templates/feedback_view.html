@@ -1,0 +1,865 @@
+{% extends 'layout.html' %}
+
+{% block title %}View Feedback - Feedback Management System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .message-card {
+        border-radius: 10px;
+        margin-bottom: 12px;
+        border-left-width: 4px;
+        transition: all 0.3s ease;
+    }
+
+    .message-content {
+        background-color: rgba(0, 0, 0, 0.05);
+        border-radius: 8px;
+        padding: 12px !important;
+    }
+
+    .status-button-group .btn {
+        transition: all 0.2s ease;
+    }
+
+    .status-button-group .btn:hover {
+        transform: translateY(-2px);
+    }
+
+    .message-chain {
+        color: #6c757d;
+    }
+
+    .status-badge {
+        font-size: 0.8rem;
+        padding: 3px 8px;
+        border-radius: 12px;
+    }
+
+    .status-accepted {
+        background-color: #d1e7dd;
+        color: #0f5132;
+    }
+
+    .status-forwarded {
+        background-color: #cfe2ff;
+        color: #084298;
+    }
+
+    .status-pending {
+        background-color: #fff3cd;
+        color: #664d03;
+    }
+
+    .status-upload, .status-uploaded {
+        background-color: #d1e7dd;
+        color: #0f5132;
+    }
+
+    .status-reviewed {
+        background-color: #cff4fc;
+        color: #055160;
+    }
+
+    .status-noted {
+        background-color: #e2e3e5;
+        color: #41464b;
+    }
+
+    /* Conversation flow styles */
+    .message-flow {
+        position: relative;
+    }
+
+    .message-flow::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 20px;
+        width: 2px;
+        background-color: #dee2e6;
+        z-index: 0;
+    }
+
+    /* E-commerce style tracking timeline */
+    .tracking-container {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        margin: 15px 0;
+    }
+
+    .tracking-header {
+        color: #495057;
+        font-size: 14px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .tracking-timeline {
+        position: relative;
+        padding: 15px 0;
+    }
+
+    .tracking-step {
+        display: flex;
+        align-items: flex-start;
+        position: relative;
+        padding-bottom: 15px;
+    }
+
+    .tracking-icon {
+        width: 30px;
+        height: 30px;
+        background-color: #e9ecef;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .tracking-step.completed .tracking-icon {
+        background-color: #6c757d;
+        color: #fff;
+    }
+
+    .tracking-step.in-progress .tracking-icon {
+        background-color: #ced4da;
+        color: #495057;
+    }
+
+    .tracking-info {
+        flex: 1;
+    }
+
+    .tracking-title {
+        font-weight: 500;
+        color: #212529;
+        margin-bottom: 5px;
+    }
+
+    .tracking-date {
+        font-size: 12px;
+        color: #6c757d;
+        margin-bottom: 5px;
+    }
+
+    .tracking-status {
+        font-size: 13px;
+        color: #495057;
+    }
+
+    .tracking-line {
+        position: absolute;
+        left: 15px;
+        top: 30px;
+        bottom: 30px;
+        width: 1px;
+        background-color: #dee2e6;
+    }
+
+    .tracking-step:last-child {
+        padding-bottom: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-comment-dots me-2"></i> Feedback Details</h1>
+        {% if current_user.is_student() %}
+            <a href="{{ url_for('track_feedback') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Back to Tracking
+            </a>
+        {% else %}
+            <a href="{{ url_for('dashboard_staff') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Feedback #{{ feedback.id }}</h5>
+                    <div>
+                        <span class="badge bg-light text-dark">
+                            {{ feedback.submission_date.strftime('%Y-%m-%d %H:%M') }}
+                        </span>
+                        {% if feedback.is_anonymous %}
+                            <span class="badge bg-warning ms-2">Anonymous</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Submission Details</h6>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>Submitted By:</span>
+                                    <span class="fw-bold">
+                                        {% if feedback.is_anonymous and current_user.is_staff() %}
+                                            Anonymous Student
+                                        {% else %}
+                                            {{ feedback.student.username }}
+                                        {% endif %}
+                                    </span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>Department:</span>
+                                    <span class="fw-bold">{{ feedback.student.department }}</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>Status:</span>
+                                    <span class="fw-bold">
+                                        {% set latest_response = feedback.responses.first() %}
+                                        {% if latest_response %}
+                                            <span class="status-badge status-{{ latest_response.status }}">{{ latest_response.status }}</span>
+                                        {% else %}
+                                            <span class="status-badge status-pending">pending</span>
+                                        {% endif %}
+                                    </span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="mb-3">Categories</h6>
+                            <div class="d-flex flex-wrap">
+                                {% for item in feedback_items %}
+                                    <span class="badge bg-secondary me-2 mb-2 p-2">{{ item.category.name }}</span>
+                                {% endfor %}
+                            </div>
+
+                            {% if current_user.is_staff() %}
+                                <h6 class="mt-4 mb-3">Overall Sentiment Analysis</h6>
+                                {% set sentiment_counts = {'positive': 0, 'neutral': 0, 'negative': 0} %}
+                                {% for item in feedback_items %}
+                                    {% if item.sentiment_label %}
+                                        {% if item.sentiment_label.lower() in sentiment_counts %}
+                                            {% set _ = sentiment_counts.update({item.sentiment_label.lower(): sentiment_counts[item.sentiment_label.lower()] + 1}) %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+
+                                <div class="d-flex flex-wrap">
+                                    <span class="badge bg-success me-2 mb-2 p-2">
+                                        <i class="fas fa-smile me-1"></i> 
+                                        Positive: {{ sentiment_counts['positive'] }}
+                                    </span>
+                                    <span class="badge bg-warning text-dark me-2 mb-2 p-2">
+                                        <i class="fas fa-meh me-1"></i> 
+                                        Neutral: {{ sentiment_counts['neutral'] }}
+                                    </span>
+                                    <span class="badge bg-danger me-2 mb-2 p-2">
+                                        <i class="fas fa-frown me-1"></i> 
+                                        Negative: {{ sentiment_counts['negative'] }}
+                                    </span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Items -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2 class="h4 mb-3">Feedback Details</h2>
+
+            {% for item in feedback_items %}
+                <div class="card border-0 shadow-sm mb-4 category-card category-{{ item.category.name|lower|replace(' ', '') }}">
+                    <div class="card-header">
+                        <h5 class="mb-0">{{ item.category.name }}</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if item.ratings.all() %}
+                            <h6 class="mb-3">Ratings</h6>
+                            <div class="table-responsive mb-4">
+                                <table class="table table-hover">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th>Question</th>
+                                            <th style="width: 100px;">Rating</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for rating in item.ratings %}
+                                            <tr>
+                                                <td>{{ rating.question.text }}</td>
+                                                <td>
+                                                    {% for i in range(5) %}
+                                                        {% if i < rating.rating_value %}
+                                                            <i class="fas fa-star text-warning"></i>
+                                                        {% else %}
+                                                            <i class="far fa-star text-muted"></i>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+
+                        {% if item.text_feedback %}
+                            <h6 class="mb-3">Comments</h6>
+                            <div class="card bg-light mb-3">
+                                <div class="card-body">
+                                    <p class="mb-0">{{ item.text_feedback }}</p>
+                                </div>
+                            </div>
+
+                            {% if current_user.is_staff() and item.sentiment_label %}
+                                <div class="d-flex align-items-center mt-3">
+                                    <h6 class="mb-0 me-3">Sentiment:</h6>
+                                    <span class="badge sentiment-{{ item.sentiment_label }} p-2">
+                                        {% if item.sentiment_label == 'positive' %}
+                                            <i class="fas fa-smile me-1"></i> Positive
+                                        {% elif item.sentiment_label == 'negative' %}
+                                            <i class="fas fa-frown me-1"></i> Negative
+                                        {% else %}
+                                            <i class="fas fa-meh me-1"></i> Neutral
+                                        {% endif %}
+                                    </span>
+                                    <span class="ms-2">(Score: {{ item.sentiment_score|round(2) }})</span>
+                                </div>
+
+                                {% if item.aspect_based_results %}
+                                    <h6 class="mt-3 mb-2">Aspect Analysis:</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th>Aspect</th>
+                                                    <th>Sentiment</th>
+                                                    <th>Mentions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% set aspects = item.aspect_based_results|tojson|fromjson %}
+                                                {% for aspect, data in aspects.items() %}
+                                                    <tr>
+                                                        <td>{{ aspect|replace('_', ' ')|title }}</td>
+                                                        <td>
+                                                            <span class="badge sentiment-{{ data.sentiment }} p-1">
+                                                                {{ data.sentiment|title }}
+                                                            </span>
+                                                        </td>
+                                                        <td>{{ data.mentions|join(', ') }}</td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% endif %}
+                            {% endif %}
+                        {% else %}
+                            <p class="text-muted">No comments provided for this category.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Responses Section -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2 class="h4 mb-3">Responses & Status Updates</h2>
+
+            {% if responses %}
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush message-flow">
+                            <!-- Message threads with conversation flow -->
+                            {% for thread in response_threads %}
+                                {% if thread.response %}
+                                    <div class="list-group-item message-card {% if thread.response.staff.is_cc() %}border-info{% elif thread.response.staff.is_hod() %}border-warning{% elif thread.response.staff.is_principal() %}border-danger{% endif %}">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="mb-0">
+                                                <span class="status-badge status-{{ thread.response.status }} me-2">{{ thread.response.status }}</span>
+                                                From: {{ thread.response.staff.username }}
+                                                {% if thread.response.staff.is_cc() %}
+                                                    <span class="badge bg-info ms-1">CC</span>
+                                                {% elif thread.response.staff.is_hod() %}
+                                                    <span class="badge bg-warning ms-1">HOD</span>
+                                                {% elif thread.response.staff.is_principal() %}
+                                                    <span class="badge bg-danger ms-1">Principal</span>
+                                                {% endif %}
+                                            </h6>
+                                            <small>{{ thread.response.response_date.strftime('%Y-%m-%d %H:%M') }}</small>
+                                        </div>
+
+                                        <div class="message-content p-2 rounded mb-2">
+                                            {% if '[Forwarded Message:' in thread.response.response_text %}
+                                                {% set parts = thread.response.response_text.split(']', 1) %}
+                                                <div class="forwarded-message-box p-2 mb-2 border-start border-primary border-3 ps-3">
+                                                    <small class="text-muted fw-bold">{{ parts[0] }}]</small>
+                                                    {% set content_parts = parts[1].split('---', 1) %}
+                                                    <p class="mb-0">{{ content_parts[0] }}</p>
+                                                </div>
+                                                {% if content_parts|length > 1 %}
+                                                    <div class="text-muted mt-1">
+                                                        <small><i>{{ content_parts[1] }}</i></small>
+                                                    </div>
+                                                {% endif %}
+                                            {% else %}
+                                                {% if '---' in thread.response.response_text %}
+                                                    {% set parts = thread.response.response_text.split('---', 1) %}
+                                                    <p class="mb-0">{{ parts[0] }}</p>
+                                                    <div class="text-muted mt-1">
+                                                        <small><i>{{ parts[1] }}</i></small>
+                                                    </div>
+                                                {% else %}
+                                                    <p class="mb-0">{{ thread.response.response_text }}</p>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+
+                                        {% if thread.response.status == 'forwarded' and thread.response.forwarded_user %}
+                                            <!-- Enhanced message tracking and reply buttons -->
+                                            <div class="tracking-container mt-3 mb-3">
+                                                <div class="tracking-header mb-2 d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <i class="fas fa-map-marker-alt me-1"></i> 
+                                                        <strong>Message Tracking</strong>
+                                                    </div>
+                                                    <div class="btn-group">
+                                                        <button class="btn btn-sm btn-outline-primary quick-reply-btn" 
+                                                                data-response-id="{{ thread.response.id }}"
+                                                                onclick="quickReply(this, 'accept')">
+                                                            <i class="fas fa-check me-1"></i> Accept
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-warning quick-reply-btn"
+                                                                data-response-id="{{ thread.response.id }}"
+                                                                onclick="quickReply(this, 'review')">
+                                                            <i class="fas fa-search me-1"></i> Review
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-info quick-reply-btn"
+                                                                data-response-id="{{ thread.response.id }}"
+                                                                onclick="quickReply(this, 'forward')">
+                                                            <i class="fas fa-share me-1"></i> Forward
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="tracking-timeline">
+                                                    <!-- Sender -->
+                                                    <div class="tracking-step completed">
+                                                        <div class="tracking-icon">
+                                                            <i class="fas fa-user-circle"></i>
+                                                        </div>
+                                                        <div class="tracking-info">
+                                                            <div class="tracking-title">{{ thread.response.staff.username }}
+                                                                {% if thread.response.staff.is_cc() %}
+                                                                    <span class="badge bg-secondary ms-1">CC</span>
+                                                                {% elif thread.response.staff.is_hod() %}
+                                                                    <span class="badge bg-secondary ms-1">HOD</span>
+                                                                {% elif thread.response.staff.is_principal() %}
+                                                                    <span class="badge bg-secondary ms-1">Principal</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="tracking-date">{{ thread.response.response_date.strftime('%Y-%m-%d %H:%M') }}</div>
+                                                            <div class="tracking-status">Sent message</div>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Connected line -->
+                                                    <div class="tracking-line"></div>
+
+                                                    <!-- Recipient -->
+                                                    <div class="tracking-step {% if thread.replies %}completed{% else %}in-progress{% endif %}">
+                                                        <div class="tracking-icon">
+                                                            <i class="fas fa-user-circle"></i>
+                                                        </div>
+                                                        <div class="tracking-info">
+                                                            <div class="tracking-title">{{ thread.response.forwarded_user.username }}
+                                                                {% if thread.response.forwarded_user.is_cc() %}
+                                                                    <span class="badge bg-secondary ms-1">CC</span>
+                                                                {% elif thread.response.forwarded_user.is_hod() %}
+                                                                    <span class="badge bg-secondary ms-1">HOD</span>
+                                                                {% elif thread.response.forwarded_user.is_principal() %}
+                                                                    <span class="badge bg-secondary ms-1">Principal</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="tracking-status">
+                                                                {% if thread.replies %}
+                                                                    Received and responded
+                                                                {% else %}
+                                                                    Awaiting response
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+
+                                        <!-- Reply buttons for staff (if applicable) -->
+                                        {% if current_user.is_staff() %}
+                                            <div class="mt-2 text-end">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary reply-to-response" 
+                                                        data-response-id="{{ thread.response.id }}"
+                                                        data-response-text="{{ thread.response.response_text }}"
+                                                        data-staff="{{ thread.response.staff.username }}">
+                                                    <i class="fas fa-reply me-1"></i> Reply to this
+                                                </button>
+                                                <!-- Allow forwarding for all staff roles -->
+                                                <button type="button" class="btn btn-sm btn-outline-primary forward-response" 
+                                                        data-response-id="{{ thread.response.id }}"
+                                                        data-response-text="{{ thread.response.response_text }}">
+                                                    <i class="fas fa-share me-1"></i> Forward this message
+                                                </button>
+                                            </div>
+                                        {% endif %}
+
+                                        <!-- Replies to this response -->
+                                        {% if thread.replies %}
+                                            <div class="replies-section mt-3 ms-4 border-start ps-3">
+                                                {% for reply in thread.replies %}
+                                                    <div class="reply-message mb-3 {% if reply.staff.is_cc() %}border-start border-info{% elif reply.staff.is_hod() %}border-start border-warning{% elif reply.staff.is_principal() %}border-start border-danger{% endif %} border-2 ps-2">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <h6 class="mb-0 small">
+                                                                <span class="status-badge status-{{ reply.status }} me-1">{{ reply.status }}</span>
+                                                                Reply from: {{ reply.staff.username }}
+                                                                {% if reply.staff.is_cc() %}
+                                                                    <span class="badge bg-info ms-1">CC</span>
+                                                                {% elif reply.staff.is_hod() %}
+                                                                    <span class="badge bg-warning ms-1">HOD</span>
+                                                                {% elif reply.staff.is_principal() %}
+                                                                    <span class="badge bg-danger ms-1">Principal</span>
+                                                                {% endif %}
+                                                            </h6>
+                                                            <small>{{ reply.response_date.strftime('%Y-%m-%d %H:%M') }}</small>
+                                                        </div>
+
+                                                        <div class="message-content p-2 rounded mb-1">
+                                                            <p class="mb-0 small">{{ reply.response_text }}</p>
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> 
+                    No responses have been added yet. Staff will review this feedback soon.
+                </div>
+            {% endif %}
+
+            <!-- Staff Response Form -->
+            {% if current_user.is_staff() %}
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Add Response</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="responseForm" method="POST" action="{{ url_for('respond_to_feedback', feedback_id=feedback.id) }}">
+                            <!-- Reply info alert - shown when replying to a specific message -->
+                            <div id="reply-section" class="alert alert-info mb-3 d-none">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span id="reply-info">Replying to message</span>
+                                    <button type="button" id="cancel-reply" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Hidden fields for tracking reply/forward chain -->
+                            <input type="hidden" id="parent_response_id" name="parent_response_id" value="">
+                            <input type="hidden" id="forwarded_message" name="forwarded_message" value="">
+
+                            <div class="mb-3">
+                                <label for="response" class="form-label">Your Response</label>
+                                <textarea class="form-control" id="response" name="response" rows="4" required></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="actionSelect" class="form-label">Action</label>
+                                {% if current_user.is_cc() %}
+                                <div class="mb-2 status-button-group">
+                                    <small class="d-block mb-1">Quick Status Options:</small>
+                                    <button type="button" class="btn btn-sm btn-outline-success status-btn me-1" data-status="accepted">Accepted</button>
+                                    <button type="button" class="btn btn-sm btn-outline-info status-btn me-1" data-status="reviewed">Reviewed</button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning status-btn me-1" data-status="upload">Uploaded</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary status-btn" data-status="forward">Forward</button>
+                                </div>
+                                {% endif %}
+
+                                {% if current_user.is_hod() %}
+                                <div class="mb-2 status-button-group">
+                                    <small class="d-block mb-1">Quick Status Options:</small>
+                                    <button type="button" class="btn btn-sm btn-outline-success status-btn me-1" data-status="noted">Noted</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary status-btn" data-status="forward">Forward to Principal</button>
+                                </div>
+                                {% endif %}
+
+                                <select class="form-select" id="actionSelect" name="action">
+                                    <option value="reply" selected>Accept & Reply</option>
+                                    <option value="forward">Forward to Higher Authority</option>
+                                    {% if current_user.is_cc() %}
+                                    <option value="upload">Mark as Uploaded</option>
+                                    <option value="reviewed">Mark as Reviewed</option>
+                                    {% endif %}
+                                    {% if current_user.is_hod() %}
+                                    <option value="noted">Mark as Noted</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+
+                            <div id="forwardToDiv" class="mb-3 d-none">
+                                <label for="forwardTo" class="form-label">Forward To</label>
+                                <select class="form-select" id="forwardTo" name="forward_to">
+                                    <option value="">Select Recipient</option>
+                                    <!-- Allow forwarding to any staff member regardless of role -->
+                                    {% for staff in User.query.filter(User.role.in_(['cc', 'hod', 'principal']), User.id != current_user.id).all() %}
+                                        <option value="{{ staff.id }}">
+                                            {{ staff.username }} 
+                                            {% if staff.role == 'cc' %}(CC){% elif staff.role == 'hod' %}(HOD){% elif staff.role == 'principal' %}(Principal){% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-paper-plane me-1"></i> Submit Response
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    function quickReply(button, action) {
+        const responseId = button.dataset.responseId;
+        const actionSelect = document.getElementById('actionSelect');
+        const responseTextarea = document.getElementById('response');
+        const forwardToDiv = document.getElementById('forwardToDiv');
+
+        if (actionSelect) {
+            actionSelect.value = action;
+        }
+
+        if (responseTextarea) {
+            responseTextarea.value = `[Quick Action: ${action.toUpperCase()}] - Responding to message ID ${responseId}`;
+            responseTextarea.focus();
+        }
+
+        if (action === 'forward') {
+            forwardToDiv.classList.remove('d-none');
+        } else {
+            forwardToDiv.classList.add('d-none');
+        }
+
+        const responseForm = document.getElementById('responseForm');
+        if (responseForm) {
+            responseForm.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    // Make quickReply function globally accessible
+    window.quickReply = quickReply;
+
+    // Handle reply-to-response buttons
+    document.querySelectorAll('.reply-to-response').forEach(button => {
+        button.addEventListener('click', function() {
+            const responseId = this.getAttribute('data-response-id');
+            const responseText = this.getAttribute('data-response-text');
+            const staffName = this.getAttribute('data-staff');
+
+            // Show reply section and update info
+            const replySection = document.getElementById('reply-section');
+            if (replySection) {
+                replySection.classList.remove('d-none');
+                document.getElementById('reply-info').textContent = `Replying to ${staffName}`;
+            }
+
+            // Set parent response ID for tracking the conversation chain
+            const parentResponseIdField = document.getElementById('parent_response_id');
+            if (parentResponseIdField) {
+                parentResponseIdField.value = responseId;
+            }
+
+            // Insert reference to the staff member being replied to
+            const responseTextarea = document.getElementById('response');
+            if (responseTextarea) {
+                responseTextarea.value = `@${staffName}: `;
+                responseTextarea.focus();
+
+                // Scroll to response form
+                const responseForm = document.getElementById('responseForm');
+                if (responseForm) {
+                    responseForm.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        });
+    });
+
+    // Handle status quick buttons for CC
+    document.querySelectorAll('.status-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const status = this.getAttribute('data-status');
+            const actionSelect = document.getElementById('actionSelect');
+            const responseTextarea = document.getElementById('response');
+
+            // Set the action dropdown value
+            if (actionSelect) {
+                if (status === 'forward') {
+                    actionSelect.value = 'forward';
+                    // Show the forward to select dropdown
+                    document.getElementById('forwardToDiv').classList.remove('d-none');
+                } else {
+                    actionSelect.value = status;
+                    // Hide the forward to select dropdown
+                    document.getElementById('forwardToDiv').classList.add('d-none');
+                }
+            }
+
+            // Set a default message based on the status
+            if (responseTextarea) {
+                if (status === 'accepted') {
+                    responseTextarea.value = 'Thank you for your feedback. We have accepted it for review.';
+                } else if (status === 'reviewed') {
+                    responseTextarea.value = 'Your feedback has been reviewed and documented.';
+                } else if (status === 'upload') {
+                    responseTextarea.value = 'Your feedback has been uploaded to our system.';
+                } else if (status === 'noted') {
+                    responseTextarea.value = 'Your feedback has been noted. Thank you for sharing your thoughts.';
+                } else if (status === 'forward') {
+                    responseTextarea.value = 'I am forwarding your feedback to the appropriate authority for further action.';
+                }
+
+                responseTextarea.focus();
+            }
+        });
+    });
+
+    // Handle action select change
+    document.getElementById('actionSelect').addEventListener('change', function() {
+        const forwardToDiv = document.getElementById('forwardToDiv');
+
+        if (this.value === 'forward') {
+            forwardToDiv.classList.remove('d-none');
+        } else {
+            forwardToDiv.classList.add('d-none');
+        }
+    });
+
+    // Forward message buttons
+    document.querySelectorAll('.forward-response').forEach(button => {
+        button.addEventListener('click', function() {
+            const responseId = this.getAttribute('data-response-id');
+            const responseText = this.getAttribute('data-response-text');
+
+            // Show reply section and update it to indicate forwarding
+            const replySection = document.getElementById('reply-section');
+            if (replySection) {
+                replySection.classList.remove('d-none');
+                document.getElementById('reply-info').textContent = 'Forwarding message';
+            }
+
+            // Set action to forward
+            const actionSelect = document.getElementById('actionSelect');
+            if (actionSelect) {
+                actionSelect.value = 'forward';
+            }
+
+            // Store original message for forwarding
+            const forwardedMessageField = document.getElementById('forwarded_message');
+            if (forwardedMessageField) {
+                forwardedMessageField.value = responseText;
+            }
+
+            // Set parent response ID for tracking the conversation chain
+            const parentResponseIdField = document.getElementById('parent_response_id');
+            if (parentResponseIdField)```python
+ {
+                parentResponseIdField.value = responseId;
+            }
+
+            // Show forward options
+            const forwardToDiv = document.getElementById('forwardToDiv');
+            if (forwardToDiv) {
+                forwardToDiv.classList.remove('d-none');
+            }
+
+            // Set default forward message
+            const responseTextarea = document.getElementById('response');
+            if (responseTextarea) {
+                responseTextarea.value = 'I am forwarding this message for your review and action.';
+                responseTextarea.focus();
+            }
+
+            // Scroll to response form
+            const responseForm = document.getElementById('responseForm');
+            if (responseForm) {
+                responseForm.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
+
+    // Cancel reply/forward button
+    const cancelReplyBtn = document.getElementById('cancel-reply');
+    if (cancelReplyBtn) {
+        cancelReplyBtn.addEventListener('click', function() {
+            // Hide reply section
+            const replySection = document.getElementById('reply-section');
+            if (replySection) {
+                replySection.classList.add('d-none');
+            }
+
+            // Reset form fields
+            const parentResponseIdField = document.getElementById('parent_response_id');
+            if (parentResponseIdField) {
+                parentResponseIdField.value = '';
+            }
+
+            const forwardedMessageField = document.getElementById('forwarded_message');
+            if (forwardedMessageField) {
+                forwardedMessageField.value = '';
+            }
+
+            // Reset action
+            const actionSelect = document.getElementById('actionSelect');
+            if (actionSelect) {
+                actionSelect.value = 'reply';
+            }
+
+            // Hide forward options
+            const forwardToDiv = document.getElementById('forwardToDiv');
+            if (forwardToDiv) {
+                forwardToDiv.classList.add('d-none');
+            }
+
+            // Clear response text
+            const responseTextarea = document.getElementById('response');
+            if (responseTextarea) {
+                responseTextarea.value = '';
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
